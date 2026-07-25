@@ -163,8 +163,11 @@ export function vercelEnvLs(agentPath: string): CmdResult {
 }
 
 /** `vercel env pull .env.local --yes` — sync remote env down. */
-export function vercelEnvPull(agentPath: string): CmdResult {
-  return run(agentPath, ["env", "pull", ".env.local", "--yes"]);
+export function vercelEnvPull(agentPath: string): Promise<CmdResult> {
+  // Async on purpose: callers refresh a stale VERCEL_OIDC_TOKEN mid-request
+  // (gateway catalog, Evolve), and a spawnSync pull would freeze the UI for
+  // the several seconds the CLI takes.
+  return runAsync(agentPath, ["env", "pull", ".env.local", "--yes"], 120_000);
 }
 
 /** Env var NAMES set on the linked Vercel project (across all targets). */

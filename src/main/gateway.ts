@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { GatewayModel, GatewayModelsResult } from "../shared/ipc";
+import { vercelEnvPull, vercelStatus } from "./vercel";
 
 const MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
 
@@ -28,6 +29,27 @@ function credential(agentPath: string): string | null {
   );
 }
 
+/**
+ * True when the credential is a JWT that has expired (or is about to). A static
+ * `AI_GATEWAY_API_KEY` has no dot-separated payload and never trips this.
+ */
+function isExpiredJwt(token: string): boolean {
+  const payload = token.split(".")[1];
+  if (!payload) {
+    return false;
+  }
+  try {
+    const claims = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8"),
+    ) as { exp?: number };
+    return (
+      typeof claims.exp === "number" && claims.exp * 1000 < Date.now() + 60_000
+    );
+  } catch {
+    return false;
+  }
+}
+
 interface RawModel {
   id?: string;
   name?: string;
@@ -46,13 +68,35 @@ interface RawModel {
  * speech, and embedding entries that can't back an agent. Uses the same
  * credential Eve uses for the gateway; on any failure the caller falls back to a
  * small curated set, so the picker still works offline or before linking.
+ *
+ * Self-heals a stale credential: `VERCEL_OIDC_TOKEN` expires ~12h after the
+ * last `vercel env pull`, so a picker opened later would 401 and silently lose
+ * the catalog. A linked agent refreshes the env once — proactively when the
+ * JWT is already expired, else on a 401/403 — and retries the fetch.
  */
 export async function gatewayModels(
   agentPath: string,
 ): Promise<GatewayModelsResult> {
-  const token = credential(agentPath);
+  let token = credential(agentPath);
   if (!token) {
     return { ok: false, models: [], error: "not-linked" };
+  }
+  let refreshed = false;
+  const refresh = async (): Promise<boolean> => {
+    if (refreshed || !vercelStatus(agentPath).linked) {
+      return false;
+    }
+    refreshed = true;
+    const pulled = await vercelEnvPull(agentPath);
+    const fresh = credential(agentPath);
+    if (!(pulled.ok && fresh) || fresh === token) {
+      return false;
+    }
+    token = fresh;
+    return true;
+  };
+  if (isExpiredJwt(token)) {
+    await refresh();
   }
   let res: Response;
   try {
@@ -61,6 +105,15 @@ export async function gatewayModels(
     });
   } catch (e) {
     return { ok: false, models: [], error: (e as Error).message };
+  }
+  if ((res.status === 401 || res.status === 403) && (await refresh())) {
+    try {
+      res = await fetch(MODELS_URL, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (e) {
+      return { ok: false, models: [], error: (e as Error).message };
+    }
   }
   if (!res.ok) {
     return { ok: false, models: [], error: `gateway ${res.status}` };
