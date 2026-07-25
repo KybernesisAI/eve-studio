@@ -132,7 +132,7 @@ async function callGateway(
   }
   if (res.status === 401) {
     // Stale OIDC token — refresh from the linked project and retry once.
-    vercelEnvPull(agentPath);
+    await vercelEnvPull(agentPath);
     token = credential(agentPath) ?? token;
     try {
       res = await post(model, system, user, token);
