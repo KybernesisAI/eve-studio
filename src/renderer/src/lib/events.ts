@@ -460,6 +460,11 @@ export function projectEvents(events: EveEvent[]): Projection {
       system("Context compacted: a summary checkpoint replaced older history");
     } else if (e.type === "context.cleared") {
       system("Context cleared: history dropped, session kept");
+    } else if (e.type === "studio.notice") {
+      // Studio-originated notices (not from the eve stream), e.g. a chat
+      // target switch that starts a fresh session on the other server.
+      closeStreaming();
+      system(String(data.message ?? ""), "warn");
     } else if (e.type === "session.failed") {
       closeStreaming();
       activeTurnId = null;

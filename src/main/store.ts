@@ -22,6 +22,13 @@ import type {
 export interface SessionCursor {
   sessionId?: string;
   streamIndex: number;
+  /**
+   * Base URL of the server that owns `sessionId`. A session id is only
+   * meaningful on the server that minted it, so when the thread's chat target
+   * moves (local dev server ↔ production deployment, or a new dev port) the
+   * next message must start a fresh session instead of replaying this one.
+   */
+  baseUrl?: string;
 }
 
 /**

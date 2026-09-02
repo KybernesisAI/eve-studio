@@ -296,7 +296,11 @@ export class ChatController {
       this.emitEvent(threadId, event);
       if (BOUNDARY.has(event.type)) {
         if (event.type === "session.waiting") {
-          store.setCursor(threadId, { sessionId, streamIndex: idx });
+          store.setCursor(threadId, {
+            sessionId,
+            streamIndex: idx,
+            baseUrl: conn.baseUrl,
+          });
           finalStatus = "waiting";
         } else {
           store.setCursor(threadId, { streamIndex: 0 });
@@ -327,7 +331,22 @@ export class ChatController {
       let sessionId: string;
       let startIndex: number;
 
-      if (cursor.sessionId) {
+      // A session id belongs to the server that minted it. If this thread was
+      // last driven against a different server (target switched between local
+      // and deployed, or the dev server came back on another port), replaying
+      // the old id would 401/409 there; start fresh instead.
+      const sameServer = !cursor.baseUrl || cursor.baseUrl === conn.baseUrl;
+      if (cursor.sessionId && !sameServer) {
+        this.emitEvent(threadId, {
+          type: "studio.notice",
+          data: {
+            message: `Chat target changed to ${conn.baseUrl}. Starting a new session there; the earlier session stays on its own server.`,
+          },
+          meta: { at: new Date().toISOString() },
+        });
+      }
+
+      if (cursor.sessionId && sameServer) {
         sessionId = cursor.sessionId;
         startIndex = cursor.streamIndex;
         try {
