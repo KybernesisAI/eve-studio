@@ -1,6 +1,6 @@
 # Eve Studio Roadmap
 
-Eve Studio is an independent open-source desktop control center for [Eve](https://eve.dev) agents, built by Kybernesis. It is not an official Vercel product. Current line: `v0.3.x`, macOS-first, built for **eve 0.49+**.
+Eve Studio is an independent open-source desktop control center for [Eve](https://eve.dev) agents, built by Kybernesis. It is not an official Vercel product. Current release: `v0.4.0`, macOS-first, built for **eve 0.49+** and Node 24.
 
 ## Shipped
 
@@ -10,7 +10,7 @@ Eve Studio is an independent open-source desktop control center for [Eve](https:
 - **Integrations**: **Add from registry** (browse/search the official eve registry and install with `eve add`), guided wizards for Slack, Discord, Telegram, Teams, Twilio, GitHub, Linear, and Buzz, Web Chat via `eve add channel/web`, connections (MCP / OpenAPI), and Vercel Connect connectors.
 - **Memory**: Eve session memory, memory slots (file memory scaffold, Supermemory via `eve add memory/supermemory`), and **Kybernesis Arcana** as an official eve extension (`eve add extension/arcana`), with key validation, local and Vercel env wiring, legacy-connection migration, and a brain browser (stats, timeline, search).
 - **Schedules**: list and create cron jobs.
-- **Deploy**: `eve deploy --non-interactive --yes`, env pull/push, secrets, logs, sandbox view.
+- **Deploy**: `eve build` and `eve deploy --non-interactive --yes` with a streamed console, dev-server logs, masked env editor, Vercel env pull and per-variable add, and a sandbox view.
 - **Evals**: list and run the agent's evals.
 - **Structure** refreshed with `eve info --json`; header chips for the installed eve version, a newer release on npm, build errors, Vercel link state, and the local server.
 - **Keep eve current**: in-app eve upgrade per agent with its own package manager (npm retried with `--legacy-peer-deps`), bumping `@kybernesis/arcana` alongside, then `eve info --json` with diagnostics.
@@ -31,6 +31,6 @@ Eve Studio is an independent open-source desktop control center for [Eve](https:
 
 ## Known issues
 
-- `eve add extension/arcana` can fail with `{"type":"failed","failureCode":"dependency_install"}` on npm-managed projects whenever the published `@kybernesis/arcana` peer range does not cover the agent's eve version (0.3.0 was pinned to eve 0.38; 0.4.0 is pinned to 0.49, so the next eve minor will hit it again). Studio falls back to installing the package with the project's package manager (`npm install --legacy-peer-deps`, `pnpm add`, or `yarn add`) and writes `agent/extensions/arcana.ts` itself. The permanent fix is a wildcard `eve` peer range in the package, as Eve's extension docs recommend.
+- `@kybernesis/arcana` 0.4.1 installs cleanly on eve 0.49, so `eve add extension/arcana` is the normal path. The package's published `eve` peer range is still pinned to a line, so a future eve minor can make `eve add` fail with `{"type":"failed","failureCode":"dependency_install"}` on npm-managed projects until the package is republished. Studio keeps its safety net: it installs the package with the project's package manager (`npm install --legacy-peer-deps`, `pnpm add`, or `yarn add`) and writes `agent/extensions/arcana.ts` itself. The permanent fix is a wildcard `eve` peer range in the package, as Eve's extension docs recommend.
 - Slack and Buzz reach the **deployed** agent only. Local dev is never reachable from those platforms; deploy to test them.
 - macOS only. The Buzz background bridge is a macOS LaunchAgent.

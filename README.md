@@ -10,7 +10,7 @@ Eve Studio is an Electron app that discovers the Eve agents on your disk and giv
 
 **→ [evestudio.dev](https://evestudio.dev)** · signed & notarized macOS builds with an in-app auto-updater.
 
-> Status: `v0.3.x`, macOS-first. Built for **eve 0.49+**.
+> Status: `v0.4.0`, macOS-first. Built for **eve 0.49+** and Node 24.
 
 ---
 
@@ -22,7 +22,7 @@ Point it at a folder that contains an Eve agent (or create a new one in-app) and
 - **Instructions & Model**: edit the system prompt (`instructions.md`) directly, and pick the model from the **live AI Gateway catalog**. Model and reasoning changes are written with `eve set --model … --reasoning …`, the same editor the Eve TUI uses. Reasoning effort: `provider-default`, `none`, `minimal`, `low`, `medium`, `high`, `xhigh`.
 - **Capabilities**: browse **tools, skills, subagents, and hooks**, scaffold new ones, and **open · edit · delete** their source files in an in-app editor. Capabilities contributed by a mounted extension are badged. Under Subagents, **Enable self-modification** installs Eve's experimental, development-only source-editing subagent so the agent can change its own files under `eve dev`.
 - **Integrations**: **Add from registry** lets you browse and search the official eve registry (channels, connections, extensions, memory providers, instrumentation) and install anything with `eve add`. Guided wizards remain for Slack, Discord, Telegram, Teams, Twilio, GitHub, Linear, and Buzz. Manage **connections** (MCP / OpenAPI), Vercel **Connect** connectors, and **channels**.
-- **Memory**: three layers in one tab. Eve's built-in session memory (durable sessions, compaction, `defineState`, the todo tool, the sandbox workspace); **memory slots** (`agent/memory/<slot>.ts`, file memory or Supermemory); and **Kybernesis Arcana**, an official eve integration installed as an extension for workspace-scoped long-term memory, with an in-app brain browser.
+- **Memory**: three layers in one tab. Eve's built-in session memory (durable sessions, compaction, `defineState`, the todo tool, the sandbox workspace); **memory slots** (`agent/memory/<slot>.ts`, file memory or Supermemory); and **Kybernesis Arcana**, an official eve integration installed as an extension (`eve add extension/arcana`) for workspace-scoped long-term memory. Studio validates the key, installs the mount, sets `ARCANA_API_KEY` and `ARCANA_WORKSPACE` locally and on Vercel, migrates legacy hand-written connections, and opens a brain browser (stats, timeline, search).
 - **Schedules**: view and create cron-driven jobs.
 - **Deploy**: link the agent to Vercel and ship to production in-app with `eve deploy`, with logs, environment and secrets management, and a sandbox view.
 - **Evals**: run the agent's eval suite and read results.
@@ -63,7 +63,7 @@ Eve is **filesystem-first**: an agent's capabilities are discovered from its dir
 - **Structure** (the tabs' contents) is refreshed with `eve info --json`, which regenerates Eve's discovery and compiled manifest without booting a server. Studio reads channel routes, tools, skills, hooks, schedules, subagents, memory slots, and extension mounts from that manifest.
 - **Model** changes go through `eve set`. **Integrations** install through `eve add <item> --non-interactive --yes`, with the NDJSON progress streamed to the in-app console. **Deploy** runs `eve deploy --non-interactive --yes`.
 - **Model catalog** is fetched live from the linked gateway's `/v1/models`, filtered to chat models, so the picker always reflects what is actually available.
-- **Vercel** linking, env pull and push, and Connect connector management shell out to the Vercel CLI.
+- **Vercel** sign-in (browser device flow), linking, env pull, per-variable env add, and Connect connector management shell out to the Vercel CLI (`npx vercel@latest`).
 
 ### Project layout
 
@@ -121,5 +121,5 @@ Eve ships its own docs inside each agent's `node_modules/eve/docs/` (tools, skil
 
 - macOS-first today. `.env*`, `node_modules`, and build output are gitignored; the app never stores or commits secrets (Vercel Connect connectors and OIDC tokens are used instead of keys where possible).
 - Slack and Buzz reach the **deployed** agent only; local dev is never reachable from those platforms.
-- Installing Arcana with `eve add extension/arcana` can fail with `dependency_install` on npm-managed projects whenever the published `@kybernesis/arcana` peer range does not cover the agent's eve version. Studio falls back to installing the package with your package manager and writing the mount itself. See [ROADMAP.md](ROADMAP.md).
+- `@kybernesis/arcana` 0.4.1 installs cleanly on eve 0.49 through `eve add extension/arcana`. If a future eve release falls outside the package's published peer range and `eve add` reports `dependency_install`, Studio falls back to installing the package with your package manager and writing the mount itself. See [ROADMAP.md](ROADMAP.md).
 - Not affiliated with Vercel. This is an independent tool for working with Eve agents.
