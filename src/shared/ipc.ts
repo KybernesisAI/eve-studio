@@ -280,6 +280,10 @@ export interface WireBrainResult {
   /** Transcript of `eve add` / the fallback install, for the console. */
   addOutput?: string;
   envVars?: string[];
+  /** The key variable the mount reads (defaults to ARCANA_API_KEY). */
+  keyEnvVar?: string;
+  /** The workspace variable the mount reads; undefined when it hard-codes the slug. */
+  workspaceEnvVar?: string;
   warnings?: string[];
   error?: string;
 }

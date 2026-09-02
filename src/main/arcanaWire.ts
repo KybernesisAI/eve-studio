@@ -558,13 +558,35 @@ export async function wireBrain(
     }
   }
 
-  // (b) env — after the install so an `eve add` rollback can't undo it
+  // (b) env, after the install so an `eve add` rollback can't undo it.
+  // Write the variables the mount actually reads: a hand-written mount may use
+  // e.g. ARCANA_GTM_API_KEY / ARCANA_GTM_WORKSPACE, or hard-code the workspace
+  // (then there is no workspace variable to set).
+  const mounted = before.mode === "extension" ? before : detectBrain(agentPath);
+  const keyEnvVar =
+    (mounted.mode === "extension" && mounted.keyEnvVar) || ARCANA_KEY_VAR;
+  const workspaceEnvVar =
+    mounted.mode === "extension"
+      ? mounted.workspaceEnvVar // undefined when the mount hard-codes it
+      : ARCANA_WORKSPACE_VAR;
   files.push(
     ...new Set([
-      ...upsertLocalEnv(agentPath, ARCANA_WORKSPACE_VAR, workspace),
-      ...upsertLocalEnv(agentPath, ARCANA_KEY_VAR, key),
+      ...(workspaceEnvVar
+        ? upsertLocalEnv(agentPath, workspaceEnvVar, workspace)
+        : []),
+      ...upsertLocalEnv(agentPath, keyEnvVar, key),
     ]),
   );
+  if (
+    mounted.mode === "extension" &&
+    !workspaceEnvVar &&
+    mounted.workspace &&
+    mounted.workspace !== workspace
+  ) {
+    warnings.push(
+      `The mount hard-codes workspace "${mounted.workspace}"; edit agent/extensions/arcana.ts to switch it to "${workspace}".`,
+    );
+  }
 
   return {
     ok: true,
@@ -573,7 +595,9 @@ export async function wireBrain(
     files,
     addOutput,
     warnings: warnings.length ? warnings : undefined,
-    envVars: [ARCANA_KEY_VAR, ARCANA_WORKSPACE_VAR],
+    envVars: workspaceEnvVar ? [keyEnvVar, workspaceEnvVar] : [keyEnvVar],
+    keyEnvVar,
+    workspaceEnvVar,
   };
 }
 

@@ -71,12 +71,19 @@ export function registerRegistryIpc(
     path: string,
     workspace: string,
     key: string,
+    vars: { keyEnvVar?: string; workspaceEnvVar?: string } = {},
   ): Promise<boolean> => {
     if (!vercelStatus(path).linked) {
       return false;
     }
-    const a = await vercelEnvSetAll(path, ARCANA_WORKSPACE_VAR, workspace);
-    const b = await vercelEnvSetAll(path, ARCANA_KEY_VAR, key);
+    // Push under the names the mount actually reads (see wireBrain).
+    const keyVar = vars.keyEnvVar ?? ARCANA_KEY_VAR;
+    const wsVar =
+      "workspaceEnvVar" in vars ? vars.workspaceEnvVar : ARCANA_WORKSPACE_VAR;
+    const a = wsVar
+      ? await vercelEnvSetAll(path, wsVar, workspace)
+      : { ok: true };
+    const b = await vercelEnvSetAll(path, keyVar, key);
     return a.ok && b.ok;
   };
 
@@ -306,6 +313,7 @@ export function registerRegistryIpc(
           path,
           input.workspace.trim(),
           input.key.trim(),
+          { keyEnvVar: r.keyEnvVar, workspaceEnvVar: r.workspaceEnvVar },
         );
         // Older Studio builds browsed via a saved credential; drop it so the
         // env-based one is authoritative.
@@ -342,6 +350,10 @@ export function registerRegistryIpc(
               path,
               cred.workspace,
               cred.key,
+              {
+                keyEnvVar: r.wire.keyEnvVar,
+                workspaceEnvVar: r.wire.workspaceEnvVar,
+              },
             );
             r.wire = { ...r.wire, pushedToVercel };
           }
