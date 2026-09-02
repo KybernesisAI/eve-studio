@@ -148,11 +148,11 @@ function EnvEditor({ agentId }: { agentId: string }): JSX.Element {
       ) : (
         <pre
           className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[12px] leading-relaxed text-muted"
-          title="Values are masked — tick “Show values” to reveal and edit"
+          title="Values are masked. Tick “Show values” to reveal and edit"
         >
           {draft
             ? maskEnv(draft)
-            : "(empty — tick “Show values” to add KEY=value lines)"}
+            : "(empty: tick “Show values” to add KEY=value lines)"}
         </pre>
       )}
     </Card>

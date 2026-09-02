@@ -234,7 +234,7 @@ export function registerRegistryIpc(
       return { workspace: saved.workspace, key: saved.key };
     }
     throw new Error(
-      `No Arcana credential for this agent — set ${ARCANA_KEY_VAR} and ${ARCANA_WORKSPACE_VAR} in .env.local or wire the brain.`,
+      `No Arcana credential for this agent. Set ${ARCANA_KEY_VAR} and ${ARCANA_WORKSPACE_VAR} in .env.local or wire the brain.`,
     );
   };
   const guarded = async <T>(

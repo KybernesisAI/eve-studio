@@ -18,7 +18,7 @@ import {
   useRegistryStream,
 } from "./RegistryInstall";
 
-/** Channels with a guided wizard in the Channels tab — the primary path. */
+/** Channels with a guided wizard in the Channels tab, the primary path. */
 export const GUIDED_CHANNELS = new Set([
   "channel/slack",
   "channel/discord",
@@ -234,7 +234,7 @@ function ItemCard({
 }
 
 /**
- * "Add from registry" — official eve 0.49 registry items, filterable by
+ * "Add from registry", official eve 0.49 registry items, filterable by
  * category + search, installed with `eve add` streamed into an inline console.
  *
  * @param mode - `"connections"` hides `channel/*` items (the Channels tab owns
@@ -355,7 +355,7 @@ export function RegistryGallery({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by name, address or description — notion, browser, hindsight, otel…"
+          placeholder="Search by name, address or description: notion, browser, hindsight, otel…"
           className="no-drag flex-1 bg-transparent text-[13px] text-text outline-none placeholder:text-faint"
         />
       </div>

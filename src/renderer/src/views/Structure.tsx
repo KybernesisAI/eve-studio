@@ -113,7 +113,7 @@ function Body({ s }: { s: AgentStructure }): JSX.Element {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <Card className="flex flex-wrap items-center gap-x-8 gap-y-3 px-4 py-3.5">
-        <Meta label="model" value={s.model ?? "—"} />
+        <Meta label="model" value={s.model ?? "none"} />
         <Meta label="sandbox" value={s.sandbox ?? "none"} />
         <Meta label="source" value={s.source} tone="text-muted" />
         <div className="flex-1" />

@@ -522,7 +522,7 @@ export async function upgradeEve(
   let res = await streamCommand(cmd, argsFor(false), cwd, onLine, 600_000);
   if (res.code !== 0 && pm === "npm" && /ERESOLVE/.test(res.output)) {
     onLine(
-      `\nnpm refused the peer-dependency graph (ERESOLVE) — retrying with --legacy-peer-deps.\n$ ${pm} ${argsFor(true).join(" ")}\n`,
+      `\nnpm refused the peer-dependency graph (ERESOLVE): retrying with --legacy-peer-deps.\n$ ${pm} ${argsFor(true).join(" ")}\n`,
     );
     res = await streamCommand(cmd, argsFor(true), cwd, onLine, 600_000);
   }
@@ -552,7 +552,7 @@ export async function upgradeEve(
   onLine(
     diagnostics
       ? `Diagnostics: ${diagnostics.errors} errors, ${diagnostics.warnings} warnings.\n`
-      : "eve info did not report diagnostics — check the Structure tab.\n",
+      : "eve info did not report diagnostics. Check the Structure tab.\n",
   );
   return {
     ok: info.ok,

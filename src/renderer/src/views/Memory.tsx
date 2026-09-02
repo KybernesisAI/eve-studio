@@ -92,11 +92,11 @@ function timeAgo(iso: string): string {
 const NATIVE = [
   {
     title: "Durable sessions + compaction",
-    body: "Every conversation persists and auto-summarizes as it approaches the context limit — nothing to author or configure.",
+    body: "Every conversation persists and auto-summarizes as it approaches the context limit: nothing to author or configure.",
   },
   {
     title: "defineState",
-    body: "Durable per-session state that survives steps, crashes and redeploys — the agent's own working memory for a session lineage.",
+    body: "Durable per-session state that survives steps, crashes and redeploys: the agent's own working memory for a session lineage.",
   },
   {
     title: "todo",
@@ -202,7 +202,7 @@ function AddFileMemoryModal({
             Wrote <span className="font-mono">{done}</span>.
           </div>
           <p className="text-2xs leading-relaxed text-muted">
-            Eve's built-in provider — shared local storage under{" "}
+            Eve's built-in provider: shared local storage under{" "}
             <span className="font-mono text-text">eve dev</span>, Vercel Blob
             when deployed. Tools surface as{" "}
             <span className="font-mono text-text">{slot}__save_memory</span> /{" "}
@@ -525,7 +525,7 @@ function Browse({ agentId }: { agentId: string }): JSX.Element {
               void runQuery();
             }
           }}
-          placeholder="Ask the brain — hybrid semantic + graph search…"
+          placeholder="Ask the brain: hybrid semantic + graph search…"
           className="no-drag flex-1 bg-transparent text-[13px] text-text outline-none placeholder:text-faint"
         />
         <Button
@@ -667,7 +667,7 @@ function WireOutcome({
 
 type Stream = ReturnType<typeof useRegistryStream>;
 
-/** What the last wire / migrate run produced — owned by ArcanaSection so it
+/** What the last wire / migrate run produced, owned by ArcanaSection so it
  * survives the form or status card re-rendering when detection flips. */
 type Outcome =
   | { kind: "wire"; result: WireBrainResult }
@@ -784,7 +784,7 @@ function WireForm({
         ), then sets{" "}
         <span className="font-mono text-muted">ARCANA_API_KEY</span> and{" "}
         <span className="font-mono text-muted">ARCANA_WORKSPACE</span> in{" "}
-        <span className="font-mono text-muted">.env.local</span> — and on the
+        <span className="font-mono text-muted">.env.local</span>, and on the
         linked Vercel project, so the deployed agent remembers too. The
         extension brings its own recall/remember skills and instructions; no
         prompt edits needed.

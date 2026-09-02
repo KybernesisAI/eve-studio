@@ -68,7 +68,7 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
     );
   };
 
-  // eve init can exit non-zero even on success — register by path, then trust it.
+  // eve init can exit non-zero even on success, register by path, then trust it.
   useEffect(() => {
     if (phase !== "running" || exitCode === undefined || finalized.current) {
       return;
@@ -86,7 +86,7 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
         const noProject = res.error?.includes("No package.json");
         setError(
           noProject
-            ? "Couldn't scaffold the agent — setup didn't finish. Check the log below and make sure you're online: eve@latest (0.49+) and a Node 24 runtime download automatically on first use."
+            ? "Couldn't scaffold the agent: setup didn't finish. Check the log below and make sure you're online: eve@latest (0.49+) and a Node 24 runtime download automatically on first use."
             : (res.error ??
                 "Scaffolding finished but the agent could not be registered."),
         );
@@ -131,7 +131,7 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
             />
           </Field>
 
-          <Field label="Model" hint="AI Gateway id — change later in Instructions → Model">
+          <Field label="Model" hint="AI Gateway id: change later in Instructions → Model">
             <Input
               value={model}
               onChange={(e) => setModel(e.target.value)}

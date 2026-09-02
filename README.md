@@ -18,15 +18,15 @@ Eve Studio is an Electron app that discovers the Eve agents on your disk and giv
 
 Point it at a folder that contains an Eve agent (or create a new one in-app) and you get, per agent:
 
-- **Chat** — a conversation console that streams the agent's turns, tool calls, subagent delegations, reasoning, approval prompts, compaction events, and cancellations or failures. Talk to the **local dev server** or your **deployed production** agent from the same window. Session controls in the composer: **Cancel turn**, **Compact context**, **Clear context**, and **Reset session**. The usage bar shows the model the session is running alongside live token and cost figures. Threads live in the sidebar and can be archived.
-- **Instructions & Model** — edit the system prompt (`instructions.md`) directly, and pick the model from the **live AI Gateway catalog**. Model and reasoning changes are written with `eve set --model … --reasoning …`, the same editor the Eve TUI uses. Reasoning effort: `provider-default`, `none`, `minimal`, `low`, `medium`, `high`, `xhigh`.
-- **Capabilities** — browse **tools, skills, subagents, and hooks**, scaffold new ones, and **open · edit · delete** their source files in an in-app editor. Capabilities contributed by a mounted extension are badged. Under Subagents, **Enable self-modification** installs Eve's experimental, development-only source-editing subagent so the agent can change its own files under `eve dev`.
-- **Integrations** — **Add from registry**: browse and search the official eve registry (channels, connections, extensions, memory providers, instrumentation) and install anything with `eve add`. Guided wizards remain for Slack, Discord, Telegram, Teams, Twilio, GitHub, Linear, and Buzz. Manage **connections** (MCP / OpenAPI), Vercel **Connect** connectors, and **channels**.
-- **Memory** — three layers in one tab: Eve's built-in session memory (durable sessions, compaction, `defineState`, the todo tool, the sandbox workspace); **memory slots** (`agent/memory/<slot>.ts`, file memory or Supermemory); and **Kybernesis Arcana**, an official eve integration installed as an extension for workspace-scoped long-term memory, with an in-app brain browser.
-- **Schedules** — view and create cron-driven jobs.
-- **Deploy** — link the agent to Vercel and ship to production in-app with `eve deploy`, with logs, environment and secrets management, and a sandbox view.
-- **Evals** — run the agent's eval suite and read results.
-- **Keep eve current** — the header shows the agent's eve version with an **↑ latest available** chip when npm has a newer release, and a red **build errors** chip when `eve info` reports discovery errors. One click upgrades eve (and `@kybernesis/arcana` when present) with the agent's own package manager, re-runs `eve info --json`, and shows the diagnostics.
+- **Chat**: a conversation console that streams the agent's turns, tool calls, subagent delegations, reasoning, approval prompts, compaction events, and cancellations or failures. Talk to the **local dev server** or your **deployed production** agent from the same window. Session controls in the composer: **Cancel turn**, **Compact context**, **Clear context**, and **Reset session**. The usage bar shows the model the session is running alongside live token and cost figures. Threads live in the sidebar and can be archived.
+- **Instructions & Model**: edit the system prompt (`instructions.md`) directly, and pick the model from the **live AI Gateway catalog**. Model and reasoning changes are written with `eve set --model … --reasoning …`, the same editor the Eve TUI uses. Reasoning effort: `provider-default`, `none`, `minimal`, `low`, `medium`, `high`, `xhigh`.
+- **Capabilities**: browse **tools, skills, subagents, and hooks**, scaffold new ones, and **open · edit · delete** their source files in an in-app editor. Capabilities contributed by a mounted extension are badged. Under Subagents, **Enable self-modification** installs Eve's experimental, development-only source-editing subagent so the agent can change its own files under `eve dev`.
+- **Integrations**: **Add from registry** lets you browse and search the official eve registry (channels, connections, extensions, memory providers, instrumentation) and install anything with `eve add`. Guided wizards remain for Slack, Discord, Telegram, Teams, Twilio, GitHub, Linear, and Buzz. Manage **connections** (MCP / OpenAPI), Vercel **Connect** connectors, and **channels**.
+- **Memory**: three layers in one tab. Eve's built-in session memory (durable sessions, compaction, `defineState`, the todo tool, the sandbox workspace); **memory slots** (`agent/memory/<slot>.ts`, file memory or Supermemory); and **Kybernesis Arcana**, an official eve integration installed as an extension for workspace-scoped long-term memory, with an in-app brain browser.
+- **Schedules**: view and create cron-driven jobs.
+- **Deploy**: link the agent to Vercel and ship to production in-app with `eve deploy`, with logs, environment and secrets management, and a sandbox view.
+- **Evals**: run the agent's eval suite and read results.
+- **Keep eve current**: the header shows the agent's eve version with an **↑ latest available** chip when npm has a newer release, and a red **build errors** chip when `eve info` reports discovery errors. One click upgrades eve (and `@kybernesis/arcana` when present) with the agent's own package manager, re-runs `eve info --json`, and shows the diagnostics.
 
 The guiding principle: **a non-technical operator should never have to open a terminal.** Linking to Vercel, pulling env, pushing secrets, installing integrations, deploying, and editing capabilities all happen through the UI.
 
@@ -69,9 +69,9 @@ Eve is **filesystem-first**: an agent's capabilities are discovered from its dir
 
 ```
 src/
-  main/       Electron main — agent process mgmt, IPC, structure, authoring, registry, Vercel
+  main/       Electron main: agent process mgmt, IPC, structure, authoring, registry, Vercel
   preload/    context-isolated bridge exposed as window.studio
-  renderer/   React app — agent rail, per-agent tabs, chat, editors, ui kit
+  renderer/   React app: agent rail, per-agent tabs, chat, editors, ui kit
   shared/     IPC channel names + shared types
 ```
 
@@ -95,10 +95,10 @@ On first run, **Add existing** to point at an agent folder, or **Create new** to
 
 ## Tech stack
 
-- **[Electron](https://www.electronjs.org)** + **[electron-vite](https://electron-vite.org)** — CJS main/preload, ESM renderer, context-isolated preload bridge (`window.studio`).
-- **React 18 + TypeScript (strict)** — renderer UI.
-- **[Tailwind CSS](https://tailwindcss.com)** + **[Zustand](https://zustand-demo.pmnd.rs)** — styling and state.
-- **[Geist](https://vercel.com/font)** + **Space Mono** (self-hosted via `@fontsource`) — typography.
+- **[Electron](https://www.electronjs.org)** + **[electron-vite](https://electron-vite.org)**: CJS main/preload, ESM renderer, context-isolated preload bridge (`window.studio`).
+- **React 18 + TypeScript (strict)**: renderer UI.
+- **[Tailwind CSS](https://tailwindcss.com)** + **[Zustand](https://zustand-demo.pmnd.rs)**: styling and state.
+- **[Geist](https://vercel.com/font)** + **Space Mono** (self-hosted via `@fontsource`): typography.
 - Packaged with **[electron-builder](https://www.electron.build)**.
 
 ---
@@ -107,11 +107,11 @@ On first run, **Add existing** to point at an agent folder, or **Create new** to
 
 Eve is Vercel's open-source agent framework. An agent is a folder, deploys as Vercel Functions with durable Workflow runs, and integrates with the Vercel platform.
 
-- **Eve docs** — <https://eve.dev/docs>
-- **Eve integrations registry** — <https://eve.dev/integrations> (Arcana: <https://eve.dev/integrations/arcana>)
-- **Vercel AI Gateway** (model access) — <https://vercel.com/docs/ai-gateway>
-- **Vercel CLI** — <https://vercel.com/docs/cli>
-- **Deployment Protection** (bypass for automation) — <https://vercel.com/docs/deployment-protection>
+- **Eve docs**: <https://eve.dev/docs>
+- **Eve integrations registry**: <https://eve.dev/integrations> (Arcana: <https://eve.dev/integrations/arcana>)
+- **Vercel AI Gateway** (model access): <https://vercel.com/docs/ai-gateway>
+- **Vercel CLI**: <https://vercel.com/docs/cli>
+- **Deployment Protection** (bypass for automation): <https://vercel.com/docs/deployment-protection>
 
 Eve ships its own docs inside each agent's `node_modules/eve/docs/` (tools, skills, subagents, hooks, channels, connections, memory, extensions, schedules, sandbox, evals), the authoritative reference for authoring.
 

@@ -5,7 +5,7 @@ import { IconExternal, IconPlus, IconRefresh } from "../ui/icons";
 import { Badge, Button, IconButton, Input, Spinner } from "../ui/kit";
 
 /**
- * Pick an existing Vercel Connect connector or create a new one — so the user
+ * Pick an existing Vercel Connect connector or create a new one, so the user
  * never has to paste a connector UID by hand.
  */
 export function ConnectorPicker({
@@ -46,7 +46,7 @@ export function ConnectorPicker({
   }, [load]);
 
   // The CLI prints a single-use authorize URL then blocks on the browser step,
-  // so stream its output — waiting for the command to return would only ever
+  // so stream its output, waiting for the command to return would only ever
   // surface a link whose code is already spent.
   useEffect(() => {
     return window.studio.vercel.onConnectorCreateChunk((c) => {
@@ -148,7 +148,7 @@ export function ConnectorPicker({
                   : "Authorization link (may have expired)"}
               </div>
               <div className="text-2xs leading-relaxed text-muted">
-                Opens Slack in your browser — pick the workspace and allow it.
+                Opens Slack in your browser. Pick the workspace and allow it.
                 The link works once, so if it errors, hit Create again for a
                 fresh one.
               </div>
@@ -170,7 +170,7 @@ export function ConnectorPicker({
       {service ? (
         <div className="flex items-center gap-1.5 text-2xs text-faint">
           <Badge tone="accent">Vercel Connect</Badge>
-          Credentials + webhook verification are managed for you — no tokens to
+          Credentials + webhook verification are managed for you: no tokens to
           store.
         </div>
       ) : null}

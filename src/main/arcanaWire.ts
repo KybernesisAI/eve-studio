@@ -502,7 +502,7 @@ export async function wireBrain(
     onLine?.(l);
   };
   if (before.mode === "extension" && before.packageInstalled) {
-    collect("Arcana extension already mounted — updating env only.\n");
+    collect("Arcana extension already mounted: updating env only.\n");
   } else {
     const add = await registryAdd(
       agentPath,
@@ -545,7 +545,7 @@ export async function wireBrain(
         usedFallback: false,
         files,
         addOutput,
-        error: `eve add needs input: ${add.message ?? "see output"}${add.nextCommand ? ` — run \`${add.nextCommand}\` in a terminal.` : ""}`,
+        error: `eve add needs input: ${add.message ?? "see output"}${add.nextCommand ? `. Run \`${add.nextCommand}\` in a terminal.` : ""}`,
       };
     } else {
       return {
@@ -624,8 +624,8 @@ export async function migrateLegacyBrain(
       wire: wired,
       info,
       error: !mounted
-        ? "The extension is not reported as mounted yet — legacy connection kept."
-        : `eve info reports ${info.errors} error(s) — legacy connection kept. ${info.error ?? ""}`.trim(),
+        ? "The extension is not reported as mounted yet: legacy connection kept."
+        : `eve info reports ${info.errors} error(s): legacy connection kept. ${info.error ?? ""}`.trim(),
     };
   }
   unlinkSync(legacyPath);

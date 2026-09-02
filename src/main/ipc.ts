@@ -177,7 +177,7 @@ function hashPath(p: string): string {
 function addAgentFromPath(dir: string): AddAgentResult {
   const pkgPath = join(dir, "package.json");
   if (!existsSync(pkgPath)) {
-    return { ok: false, error: "No package.json — this isn't an Eve project." };
+    return { ok: false, error: "No package.json: this isn't an Eve project." };
   }
   const hasAgentDir = existsSync(join(dir, "agent"));
   const flatAgent =
@@ -419,7 +419,7 @@ export function registerIpc(): IpcHandles {
         return {
           ok: false,
           output:
-            "Start the agent locally first — the test route only runs under eve dev.",
+            "Start the agent locally first: the test route only runs under eve dev.",
         };
       }
       try {
@@ -924,7 +924,7 @@ export function registerIpc(): IpcHandles {
     if (target === "deployed") {
       const d = store.getDeploy(agentId);
       if (!d.url) {
-        throw new Error("No deployed URL set — set it in Chat → Deployed.");
+        throw new Error("No deployed URL set. Set it in Chat → Deployed.");
       }
       const a = store.getAgent(agentId);
       const path = a?.path;
@@ -946,7 +946,7 @@ export function registerIpc(): IpcHandles {
     }
     const url = agents.url(agentId);
     if (!url) {
-      throw new Error("Agent isn't running — start it first.");
+      throw new Error("Agent isn't running. Start it first.");
     }
     return { baseUrl: url };
   };
@@ -1169,7 +1169,7 @@ export function registerIpc(): IpcHandles {
     async (_e: IpcMainInvokeEvent, id: string): Promise<{ ok: boolean; output: string }> => {
       const cred = store.getBuzz(id);
       if (!cred) {
-        return { ok: false, output: "No Buzz identity — run the earlier steps first." };
+        return { ok: false, output: "No Buzz identity. Run the earlier steps first." };
       }
       const path = agentPathOf(id);
       const lines: string[] = [];
@@ -1460,7 +1460,7 @@ export function registerIpc(): IpcHandles {
       if (!cred?.botToken) {
         return {
           ok: false,
-          error: "No saved bot — finish the Bot step first.",
+          error: "No saved bot. Finish the Bot step first.",
         };
       }
       // Register with the STORED secret so it always matches the deployed env —
@@ -1531,10 +1531,10 @@ export function registerIpc(): IpcHandles {
       let reason: string | undefined;
       if (h.protected) {
         reason =
-          "Blocked by Vercel Deployment Protection — add a Protection Bypass secret below.";
+          "Blocked by Vercel Deployment Protection. Add a Protection Bypass secret below.";
       } else if (h.status === 401 || h.status === 403) {
         reason =
-          "Reached the agent but route auth rejected the request — run `vercel env pull` to refresh the OIDC token, or the agent's eve channel auth blocks external clients.";
+          "Reached the agent but route auth rejected the request. Run `vercel env pull` to refresh the OIDC token, or the agent's eve channel auth blocks external clients.";
       } else if (!h.ok && h.status === 0) {
         reason = "Couldn't reach the URL.";
       }

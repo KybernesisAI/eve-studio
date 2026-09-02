@@ -92,7 +92,7 @@ export function Deploy(): JSX.Element {
           <Console
             text={output}
             busy={running}
-            placeholder="Run Build or Deploy to see output. Deploy runs `eve deploy --non-interactive --yes` — link the project first (Environment tab, or `eve link` in a terminal)."
+            placeholder="Run Build or Deploy to see output. Deploy runs `eve deploy --non-interactive --yes`. Link the project first (Environment tab, or `eve link` in a terminal)."
             className="min-h-0 flex-1"
           />
         </div>

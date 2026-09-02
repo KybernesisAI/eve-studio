@@ -5,7 +5,7 @@ import { Button, Input, Modal, Spinner } from "../ui/kit";
 import { ConnectorPicker } from "./ConnectorPicker";
 
 /**
- * Guided, end-to-end Slack setup — the flow Studio was missing. Walks the user
+ * Guided, end-to-end Slack setup, the flow Studio was missing. Walks the user
  * through the four things that actually make Slack work: authorize the bot
  * (a team-level Vercel Connect client), route its events to THIS agent, write
  * the channel file, and (optionally) set a target for proactive messages.
@@ -53,7 +53,7 @@ export function SlackSetup({
       setAttached(true);
     } else {
       setAttachErr(
-        r.output || "Attach failed — is the project linked to Vercel?",
+        r.output || "Attach failed: is the project linked to Vercel?",
       );
     }
   };
@@ -119,7 +119,7 @@ export function SlackSetup({
           ))}
         </div>
 
-        {/* Step 0 — explainer */}
+        {/* Step 0: explainer */}
         {step === 0 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -128,38 +128,38 @@ export function SlackSetup({
             </p>
             <ul className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">1. Bot</strong> — a Vercel Connect
+                <strong className="text-text">1. Bot</strong>: a Vercel Connect
                 “Slack client”, created once for your team and installed into
                 your workspace. This is <em>who</em> messages come from.
               </li>
               <li>
-                <strong className="text-text">2. Connect</strong> — route that
+                <strong className="text-text">2. Connect</strong>: route that
                 bot’s events to <em>this</em> agent (per-agent).
               </li>
               <li>
-                <strong className="text-text">3. Channel</strong> — the code
+                <strong className="text-text">3. Channel</strong>: the code
                 file in the agent that uses the bot.
               </li>
               <li>
-                <strong className="text-text">4. Target</strong> — a Slack
+                <strong className="text-text">4. Target</strong>: a Slack
                 channel/DM id, only needed if the agent should message you
                 proactively (e.g. a scheduled reminder).
               </li>
             </ul>
             <p className="text-2xs text-faint">
-              For @mentions and DMs, no target is needed — the agent just
+              For @mentions and DMs, no target is needed: the agent just
               replies in the thread. Slack only reaches the <em>deployed</em>{" "}
               agent.
             </p>
           </div>
         ) : null}
 
-        {/* Step 1 — bot */}
+        {/* Step 1: bot */}
         {step === 1 ? (
           <div className="space-y-3">
             <div className="text-[13px] text-muted">
               Pick an existing Slack bot, or <strong>Create</strong> one, then{" "}
-              <strong>Open to authorize</strong> — that installs the Eve app
+              <strong>Open to authorize</strong>: that installs the Eve app
               into your Slack workspace. Reuse one bot across agents, or give
               each its own.
             </div>
@@ -172,7 +172,7 @@ export function SlackSetup({
           </div>
         ) : null}
 
-        {/* Step 2 — attach */}
+        {/* Step 2: attach */}
         {step === 2 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -203,7 +203,7 @@ export function SlackSetup({
           </div>
         ) : null}
 
-        {/* Step 3 — channel file */}
+        {/* Step 3: channel file */}
         {step === 3 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -236,7 +236,7 @@ export function SlackSetup({
           </div>
         ) : null}
 
-        {/* Step 4 — target (optional) */}
+        {/* Step 4: target (optional) */}
         {step === 4 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -252,7 +252,7 @@ export function SlackSetup({
               <li>
                 • A channel: its <strong>channel ID</strong> (
                 <span className="font-mono">C012ABC</span>, in the channel’s
-                details) — and <strong>invite the bot</strong> to it.
+                details), and <strong>invite the bot</strong> to it.
               </li>
             </ul>
             <div className="flex gap-2">
@@ -301,7 +301,7 @@ export function SlackSetup({
           </div>
         ) : null}
 
-        {/* Step 5 — ship */}
+        {/* Step 5: ship */}
         {step === 5 ? (
           <div className="space-y-3">
             <div className="rounded-lg bg-success/10 px-3 py-2 text-[13px] text-success">
@@ -309,11 +309,11 @@ export function SlackSetup({
             </div>
             <ol className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">Deploy</strong> — Slack only
+                <strong className="text-text">Deploy</strong>: Slack only
                 reaches the deployed agent, never local dev.
               </li>
               <li>
-                <strong className="text-text">Test</strong> — invite the bot to
+                <strong className="text-text">Test</strong>: invite the bot to
                 a channel and <span className="font-mono">@mention</span> it, or
                 DM it. It replies in-thread.
               </li>

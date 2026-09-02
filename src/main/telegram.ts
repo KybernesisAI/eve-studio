@@ -79,7 +79,7 @@ export async function telegramVerify(
     return {
       ok: false,
       error: /unauthorized/i.test(r.error)
-        ? "That token was rejected by Telegram — double-check you copied all of it from BotFather."
+        ? "That token was rejected by Telegram. Double-check you copied all of it from BotFather."
         : r.error,
     };
   }

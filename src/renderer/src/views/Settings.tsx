@@ -36,11 +36,11 @@ export function Settings({ info }: { info: AppInfo | null }): JSX.Element {
             <Kicker>Application</Kicker>
             <Card>
               <div className="divide-y divide-border/70">
-                <InfoRow k="Version" v={info?.appVersion ?? "—"} />
-                <InfoRow k="Electron" v={info?.electron ?? "—"} />
-                <InfoRow k="Node" v={info?.node ?? "—"} />
-                <InfoRow k="Chromium" v={info?.chrome ?? "—"} />
-                <InfoRow k="Platform" v={info?.platform ?? "—"} />
+                <InfoRow k="Version" v={info?.appVersion ?? "n/a"} />
+                <InfoRow k="Electron" v={info?.electron ?? "n/a"} />
+                <InfoRow k="Node" v={info?.node ?? "n/a"} />
+                <InfoRow k="Chromium" v={info?.chrome ?? "n/a"} />
+                <InfoRow k="Platform" v={info?.platform ?? "n/a"} />
               </div>
             </Card>
           </section>
@@ -90,7 +90,7 @@ export function Settings({ info }: { info: AppInfo | null }): JSX.Element {
             <p className="text-[13px] leading-relaxed text-muted">
               Eve Studio is an independent open-source project by Kybernesis.
               It is not an official Vercel product. Eve is Vercel's open-source
-              agent framework — docs at https://eve.dev/docs, integrations at
+              agent framework: docs at https://eve.dev/docs, integrations at
               https://eve.dev/integrations. Agents need eve 0.49+ and Node 24.
             </p>
           </section>
@@ -100,7 +100,7 @@ export function Settings({ info }: { info: AppInfo | null }): JSX.Element {
             <p className="text-[13px] leading-relaxed text-muted">
               Agents, chat threads, and Arcana brain keys are stored locally in
               this app's user-data directory. Brain keys are held in plain JSON
-              for now — an OS-keychain vault is a planned hardening pass.
+              for now: an OS-keychain vault is a planned hardening pass.
               Nothing leaves your machine except calls to the agents' own dev
               servers, Vercel, the eve registry, and Arcana.
             </p>

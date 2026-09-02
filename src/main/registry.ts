@@ -237,7 +237,7 @@ function safeItem(item: string): string {
   const s = item.trim();
   if (!/^[A-Za-z0-9@][A-Za-z0-9@._\-\/:]*$/.test(s)) {
     throw new Error(
-      `Refusing to install "${item}" — not a registry item name.`,
+      `Refusing to install "${item}": not a registry item name.`,
     );
   }
   return s;

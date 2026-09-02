@@ -195,11 +195,11 @@ function AddChannelModal({
       } else if (r.needsInput) {
         setErr(
           r.nextCommand
-            ? `Setup needs input — finish in a terminal: ${r.nextCommand}`
-            : "Setup needs input — finish it in a terminal with eve add channel/web.",
+            ? `Setup needs input. Finish in a terminal: ${r.nextCommand}`
+            : "Setup needs input. Finish it in a terminal with eve add channel/web.",
         );
       } else {
-        setErr("Install failed — see output.");
+        setErr("Install failed. See output.");
       }
       return;
     }
@@ -358,7 +358,7 @@ function AddChannelModal({
             <div>
               <div className="mb-1 text-xs font-medium text-muted">
                 File name{" "}
-                <span className="text-faint">— channels/&lt;name&gt;.ts</span>
+                <span className="text-faint">channels/&lt;name&gt;.ts</span>
               </div>
               <input
                 value={customName}
@@ -429,7 +429,7 @@ export function Channels(): JSX.Element {
     } finally {
       setLoading(false);
     }
-    // Wiring (connector + attachment) needs a Vercel call — load it separately
+    // Wiring (connector + attachment) needs a Vercel call, load it separately
     // so the list renders immediately and the badges fill in when ready.
     window.studio.agents
       .channelWiring(id)
@@ -504,7 +504,7 @@ export function Channels(): JSX.Element {
       setFinishMsg({
         name,
         ok: false,
-        text: "No production deployment found — deploy the agent first, then finish setup.",
+        text: "No production deployment found. Deploy the agent first, then finish setup.",
       });
       return;
     }
@@ -513,7 +513,7 @@ export function Channels(): JSX.Element {
       const r = await window.studio.twilio.setWebhooks(id, base);
       setFinishMsg(
         r.ok && r.live
-          ? { name, ok: true, text: "Number webhooks set — connected." }
+          ? { name, ok: true, text: "Number webhooks set: connected." }
           : {
               name,
               ok: false,
@@ -527,13 +527,13 @@ export function Channels(): JSX.Element {
       );
       setFinishMsg(
         r.ok && !r.lastError
-          ? { name, ok: true, text: "Webhook registered — connected." }
+          ? { name, ok: true, text: "Webhook registered: connected." }
           : {
               name,
               ok: false,
               text: r.lastError
                 ? /401|403|unauthorized|forbidden/i.test(r.lastError)
-                  ? "Telegram is blocked by Vercel Deployment Protection — turn off Vercel Authentication for Production, then retry."
+                  ? "Telegram is blocked by Vercel Deployment Protection. Turn off Vercel Authentication for Production, then retry."
                   : `Telegram couldn't deliver: ${r.lastError}`
                 : (r.error ?? "Couldn't register the webhook."),
             },
@@ -545,14 +545,14 @@ export function Channels(): JSX.Element {
       );
       setFinishMsg(
         r.ok && r.live
-          ? { name, ok: true, text: "Endpoint verified — connected." }
+          ? { name, ok: true, text: "Endpoint verified: connected." }
           : {
               name,
               ok: false,
               text:
                 r.error &&
                 /could not be verified|not.*verif|401|403/i.test(r.error)
-                  ? "Discord couldn't verify the endpoint — make sure the agent is deployed and Vercel Deployment Protection is off for Production, then retry."
+                  ? "Discord couldn't verify the endpoint. Make sure the agent is deployed and Vercel Deployment Protection is off for Production, then retry."
                   : (r.error ?? "Couldn't verify the endpoint."),
             },
       );
@@ -596,7 +596,7 @@ export function Channels(): JSX.Element {
               channels (Slack, GitHub, Linear) also need their connector
               attached &amp; authorized in Vercel, plus a redeploy, before they
               can send or receive. A channel lets the agent reply where its
-              events arrive and be posted to by schedules — it is{" "}
+              events arrive and be posted to by schedules: it is{" "}
               <span className="font-medium">not</span> a tool the agent can call
               to message you from a normal chat.
             </p>
@@ -648,11 +648,11 @@ export function Channels(): JSX.Element {
                                   </Badge>
                                 ) : tg?.lastError ? (
                                   <Badge tone="warn">
-                                    webhook blocked — needs attention
+                                    webhook blocked: needs attention
                                   </Badge>
                                 ) : tg?.configured ? (
                                   <Badge tone="warn">
-                                    webhook not live — finish setup
+                                    webhook not live. Finish setup
                                   </Badge>
                                 ) : (
                                   <Badge>added</Badge>
@@ -665,11 +665,11 @@ export function Channels(): JSX.Element {
                                   </Badge>
                                 ) : dc?.lastError ? (
                                   <Badge tone="warn">
-                                    endpoint blocked — needs attention
+                                    endpoint blocked: needs attention
                                   </Badge>
                                 ) : dc?.configured ? (
                                   <Badge tone="warn">
-                                    endpoint not set — finish setup
+                                    endpoint not set. Finish setup
                                   </Badge>
                                 ) : (
                                   <Badge>added</Badge>
@@ -682,11 +682,11 @@ export function Channels(): JSX.Element {
                                   </Badge>
                                 ) : tw?.lastError ? (
                                   <Badge tone="warn">
-                                    webhooks blocked — needs attention
+                                    webhooks blocked: needs attention
                                   </Badge>
                                 ) : tw?.configured ? (
                                   <Badge tone="warn">
-                                    webhooks not set — finish setup
+                                    webhooks not set. Finish setup
                                   </Badge>
                                 ) : (
                                   <Badge>added</Badge>
@@ -699,7 +699,7 @@ export function Channels(): JSX.Element {
                                   </Badge>
                                 ) : tm?.lastError ? (
                                   <Badge tone="warn">
-                                    credentials rejected — re-check
+                                    credentials rejected. Re-check
                                   </Badge>
                                 ) : tm?.configured ? (
                                   <Badge tone="warn">
@@ -717,7 +717,7 @@ export function Channels(): JSX.Element {
                                   </Badge>
                                 ) : bz?.member ? (
                                   <Badge tone="warn">
-                                    member — bridge not running
+                                    member: bridge not running
                                   </Badge>
                                 ) : bz?.configured ? (
                                   <Badge tone="warn">
@@ -733,7 +733,7 @@ export function Channels(): JSX.Element {
                                 </Badge>
                               ) : w?.attached === false ? (
                                 <Badge tone="warn">
-                                  not attached — finish setup
+                                  not attached. Finish setup
                                 </Badge>
                               ) : (
                                 <Badge>added</Badge>
@@ -1127,7 +1127,7 @@ export function Channels(): JSX.Element {
                 channels/{remove.name}.ts
               </span>{" "}
               from the agent. Redeploy for it to take effect. The Vercel Connect
-              connector stays attached — remove that in Vercel if you no longer
+              connector stays attached. Remove that in Vercel if you no longer
               want it.
             </p>
             {removeErr ? (

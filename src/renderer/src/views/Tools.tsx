@@ -75,7 +75,7 @@ function NewToolModal({
         </div>
       ) : (
         <div className="space-y-3 p-4">
-          <Field label="Name" hint="snake_case — becomes tools/<name>.ts">
+          <Field label="Name" hint="snake_case, becomes tools/<name>.ts">
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -213,7 +213,7 @@ export function Tools(): JSX.Element {
                   }
                   desc={
                     t.legacyStudio
-                      ? `${t.description ? `${t.description} — ` : ""}Evolve was retired; this tool is safe to delete.`
+                      ? `${t.description ? `${t.description.replace(/\.$/, "")}. ` : ""}Evolve was retired; this tool is safe to delete.`
                       : t.description || undefined
                   }
                   onClick={

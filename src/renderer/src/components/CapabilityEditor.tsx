@@ -38,7 +38,7 @@ export function CapabilityEditor({
       setOthers(r.otherPaths);
       setMissing(r.missing);
     } catch {
-      // Read failed on disk — resolve the spinner into the fallback message.
+      // Read failed on disk, resolve the spinner into the fallback message.
       setFiles([]);
       setMissing(true);
     }

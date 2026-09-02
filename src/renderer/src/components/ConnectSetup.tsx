@@ -20,22 +20,22 @@ const SERVICES: Record<
   github: {
     label: "GitHub",
     what: "a GitHub App (a Vercel Connect “GitHub client”) installed into your org/repos",
-    test: "@mention the bot in an issue or PR comment — it checks out the ref and replies.",
+    test: "@mention the bot in an issue or PR comment: it checks out the ref and replies.",
     manageUrl: "https://vercel.com/d?to=/%5Bteam%5D/~/connect",
   },
   linear: {
     label: "Linear",
     what: "a Linear app (a Vercel Connect “Linear client”) authorized in your workspace",
-    test: "delegate or @mention the agent on a Linear issue — it runs an Agent Session and posts back.",
+    test: "delegate or @mention the agent on a Linear issue: it runs an Agent Session and posts back.",
     manageUrl: "https://vercel.com/d?to=/%5Bteam%5D/~/connect",
   },
 };
 
 /**
- * Guided setup for the Vercel-Connect-backed channels (GitHub, Linear) — the same
+ * Guided setup for the Vercel-Connect-backed channels (GitHub, Linear), the same
  * shape as Slack: authorize the app (a team-level Connect client), route its
  * events to THIS agent (attach at /eve/v1/<service>), write the channel file, then
- * deploy. Credentials are brokered by Connect, so there are no secrets to store —
+ * deploy. Credentials are brokered by Connect, so there are no secrets to store:
  * the "connected" badge comes from the channel's attachment state (wiring).
  */
 export function ConnectSetup({
@@ -75,7 +75,7 @@ export function ConnectSetup({
       setAttached(true);
     } else {
       setAttachErr(
-        r.output || "Attach failed — is the project linked to Vercel?",
+        r.output || "Attach failed: is the project linked to Vercel?",
       );
     }
   };
@@ -125,25 +125,25 @@ export function ConnectSetup({
           ))}
         </div>
 
-        {/* Step 0 — explainer */}
+        {/* Step 0: explainer */}
         {step === 0 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
               {cfg.label} talks to your agent through {cfg.what}, brokered by
-              Vercel Connect — no secrets to manage. Three steps:
+              Vercel Connect: no secrets to manage. Three steps:
             </p>
             <ul className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">1. App</strong> — pick or create
+                <strong className="text-text">1. App</strong>: pick or create
                 the Connect {cfg.label} client and authorize it.
               </li>
               <li>
-                <strong className="text-text">2. Connect</strong> — route its
+                <strong className="text-text">2. Connect</strong>: route its
                 events to <em>this</em> agent (attaches at{" "}
                 <span className="font-mono">/eve/v1/{service}</span>).
               </li>
               <li>
-                <strong className="text-text">3. Channel</strong> — write the
+                <strong className="text-text">3. Channel</strong>: write the
                 channel file, then deploy.
               </li>
             </ul>
@@ -154,12 +154,12 @@ export function ConnectSetup({
           </div>
         ) : null}
 
-        {/* Step 1 — app / connector */}
+        {/* Step 1: app / connector */}
         {step === 1 ? (
           <div className="space-y-3">
             <div className="text-[13px] text-muted">
               Pick an existing {cfg.label} client, or <strong>Create</strong>{" "}
-              one, then <strong>Open to authorize</strong> — that installs the
+              one, then <strong>Open to authorize</strong>: that installs the
               app. Reuse one across agents, or give each its own.
             </div>
             <ConnectorPicker
@@ -171,7 +171,7 @@ export function ConnectSetup({
           </div>
         ) : null}
 
-        {/* Step 2 — attach */}
+        {/* Step 2: attach */}
         {step === 2 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -202,7 +202,7 @@ export function ConnectSetup({
           </div>
         ) : null}
 
-        {/* Step 3 — channel file */}
+        {/* Step 3: channel file */}
         {step === 3 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -233,7 +233,7 @@ export function ConnectSetup({
           </div>
         ) : null}
 
-        {/* Step 4 — ship */}
+        {/* Step 4: ship */}
         {step === 4 ? (
           <div className="space-y-3">
             <div className="rounded-lg bg-success/10 px-3 py-2 text-[13px] text-success">
@@ -241,11 +241,11 @@ export function ConnectSetup({
             </div>
             <ol className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">Deploy</strong> — {cfg.label} only
+                <strong className="text-text">Deploy</strong>: {cfg.label} only
                 reaches the deployed agent.
               </li>
               <li>
-                <strong className="text-text">Test</strong> — {cfg.test}
+                <strong className="text-text">Test</strong>: {cfg.test}
               </li>
             </ol>
             <Button

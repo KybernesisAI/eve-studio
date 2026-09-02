@@ -80,7 +80,7 @@ export function EveUpgradeModal({
               eve 0.49 needs Node 24. Studio provisions a Node 24 runtime for the
               local dev server automatically; production runs on Vercel's Node.
               A running dev server is stopped first so the next Start boots the
-              new version. Your source files are not modified — review the
+              new version. Your source files are not modified. Review the
               changelog at https://eve.dev/docs if the diagnostics flag an API
               change.
             </div>

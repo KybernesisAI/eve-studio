@@ -116,7 +116,7 @@ export function buzzGenKey(agentId: string, relayUrl: string): BuzzKeyResult {
 export async function buzzVerify(agentId: string): Promise<BuzzVerifyResult> {
   const cred = getBuzz(agentId);
   if (!cred) {
-    return { ok: false, error: "No Buzz identity yet — generate one first." };
+    return { ok: false, error: "No Buzz identity yet. Generate one first." };
   }
   // Relay-level admission check: an authed POST /query succeeds (HTTP 200) only
   // for admitted members — outsiders get 403 relay_membership_required. The

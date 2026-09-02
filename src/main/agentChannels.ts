@@ -110,14 +110,14 @@ const ENVCH: Record<
     mod: "eve/channels/telegram",
     body: 'telegramChannel({ botUsername: "my_bot" })',
     env: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET_TOKEN"],
-    note: "Replace botUsername with your bot's @handle (no @) — group @mentions only wake the bot when it matches.",
+    note: "Replace botUsername with your bot's @handle (no @): group @mentions only wake the bot when it matches.",
   },
   twilio: {
     factory: "twilioChannel",
     mod: "eve/channels/twilio",
     body: "twilioChannel({ allowFrom: [] })",
     env: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
-    note: 'allowFrom is required and starts empty (allows nobody) — add the numbers that may reach the agent, e.g. ["+15551234567"].',
+    note: 'allowFrom is required and starts empty (allows nobody). Add the numbers that may reach the agent, e.g. ["+15551234567"].',
   },
 };
 
@@ -390,7 +390,7 @@ async function postToBuzz(channelId: string, text: string): Promise<void> {
     .replace(/\\/+$/, "");
   const keyHex = process.env.BUZZ_PRIVATE_KEY || "";
   if (!relay || !keyHex) {
-    console.warn("[buzz] BUZZ_RELAY_URL / BUZZ_PRIVATE_KEY not set — skipping");
+    console.warn("[buzz] BUZZ_RELAY_URL / BUZZ_PRIVATE_KEY not set: skipping");
     return;
   }
   const sk = Uint8Array.from(keyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));

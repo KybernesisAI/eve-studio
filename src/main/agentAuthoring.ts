@@ -45,7 +45,7 @@ export function readModelConfig(agentPath: string): ModelConfig {
       model: DEFAULT_MODEL,
       reasoning: null,
       editable: false,
-      note: `No agent.ts — Eve defaults the model to ${DEFAULT_MODEL}. Create agent.ts (or run \`eve init\`) to set it.`,
+      note: `No agent.ts. Eve defaults the model to ${DEFAULT_MODEL}. Create agent.ts (or run \`eve init\`) to set it.`,
     };
   }
   const src = readFileSync(path, "utf8");
@@ -58,7 +58,7 @@ export function readModelConfig(agentPath: string): ModelConfig {
     editable: model !== null,
     note: model
       ? null
-      : "The model isn't a plain gateway string (dynamic or direct-provider) — edit agent.ts by hand.",
+      : "The model isn't a plain gateway string (dynamic or direct-provider). Edit agent.ts by hand.",
   };
 }
 

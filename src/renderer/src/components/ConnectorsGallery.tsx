@@ -84,7 +84,7 @@ function UseConnectorModal({
       name: connName,
       kind: "mcp",
       url,
-      description: `${connector.name} — via Vercel Connect (${connector.uid})`,
+      description: `${connector.name}, via Vercel Connect (${connector.uid})`,
       authMode: scope,
       connector: connector.uid,
     });
@@ -149,7 +149,7 @@ function UseConnectorModal({
           </div>
 
           <div className="rounded-lg border border-border bg-subtle p-3 text-2xs leading-relaxed text-muted">
-            You already attached this connector to the project in Vercel — that
+            You already attached this connector to the project in Vercel. That
             grants permission to mint tokens. This step writes the{" "}
             <b className="text-text">agent code</b> that actually uses it: as a{" "}
             <b className="text-text">connection</b> (the agent gets this
@@ -181,7 +181,7 @@ function UseConnectorModal({
               <p className="text-2xs leading-relaxed text-muted">
                 Adds{" "}
                 <span className="font-mono">channels/{connector.type}.ts</span>{" "}
-                wired to this connector — the agent replies where{" "}
+                wired to this connector: the agent replies where{" "}
                 {connector.type} events arrive.
               </p>
               {err ? <div className="text-xs text-danger">{err}</div> : null}
@@ -207,7 +207,7 @@ function UseConnectorModal({
                   <b className="text-text">Custom OAuth</b> connector for the
                   provider's MCP host (e.g.{" "}
                   <span className="font-mono">mcp.linear.app</span>). If tools
-                  return "authorization required", that's why — create that
+                  return "authorization required", that's why. Create that
                   connector in Vercel Connect and use it here instead.
                 </div>
               ) : null}
@@ -448,8 +448,8 @@ export function ConnectorsGallery({
       ) : list.length === 0 ? (
         <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
           <div className="max-w-sm text-[13px] leading-relaxed text-muted">
-            No connectors yet. Browse the full provider catalog — Slack, GitHub,
-            Notion, Figma, Shopify, and hundreds more — and add one.
+            No connectors yet. Browse the full provider catalog (Slack, GitHub,
+            Notion, Figma, Shopify, and hundreds more) and add one.
           </div>
           <Button
             variant="primary"
@@ -472,7 +472,7 @@ export function ConnectorsGallery({
             </div>
             {mine.length === 0 ? (
               <div className="rounded-lg border border-border bg-subtle px-3 py-3 text-2xs leading-relaxed text-muted">
-                None yet — pick one of your team's connectors below and "Use in
+                None yet. Pick one of your team's connectors below and "Use in
                 agent", or add a new one.
               </div>
             ) : (

@@ -202,7 +202,7 @@ function AddConnectionModal({
 
           <Field
             label="Description"
-            hint="written for the model — routing hint"
+            hint="written for the model: routing hint"
           >
             <Input
               value={description}
@@ -225,7 +225,7 @@ function AddConnectionModal({
           {authMode === "static" ? (
             <Field
               label="Token env var"
-              hint="Bearer — defaults to <NAME>_TOKEN"
+              hint="Bearer: defaults to <NAME>_TOKEN"
             >
               <Input
                 value={envVar}
@@ -363,7 +363,7 @@ function ExtensionMountModal({
           </div>
         ) : !exists ? (
           <div className="rounded-lg bg-warn/10 px-3 py-2 text-[13px] text-warn">
-            {relPath} was not found on disk — the manifest may be stale.
+            {relPath} was not found on disk: the manifest may be stale.
           </div>
         ) : (
           <Textarea
@@ -459,7 +459,7 @@ export function Connections(): JSX.Element {
                   <IconPlug className="h-6 w-6" />
                 </div>
                 <div className="max-w-sm text-[13px] leading-relaxed text-muted">
-                  No connections yet — wire an MCP server or OpenAPI API
+                  No connections yet. Wire an MCP server or OpenAPI API
                   directly, use a Vercel Connect connector, or install one from
                   the registry below.
                 </div>

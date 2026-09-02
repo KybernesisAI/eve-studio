@@ -11,7 +11,7 @@ import { Button, Input, Modal, Spinner } from "../ui/kit";
  * agent's profile (name/bio/avatar) → wire credentials + channel file → start
  * the inbound bridge → deploy & test.
  *
- * The bridge exists because hosted Buzz relays don't push events out yet —
+ * The bridge exists because hosted Buzz relays don't push events out yet:
  * see resources/buzz-bridge.mjs. Replies always come from the DEPLOYED agent.
  */
 export function BuzzSetup({
@@ -26,7 +26,7 @@ export function BuzzSetup({
   const setSection = useStore((s) => s.setSection);
   const [step, setStep] = useState(0);
 
-  // Step 1 — relay + identity
+  // Step 1: relay + identity
   const [relay, setRelay] = useState("");
   const [key, setKey] = useState<BuzzKeyResult | null>(null);
   const [genErr, setGenErr] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export function BuzzSetup({
   const [member, setMember] = useState<BuzzVerifyResult | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Step 2 — profile
+  // Step 2: profile
   const [name, setName] = useState("");
   const [about, setAbout] = useState("");
   const [avatarData, setAvatarData] = useState("");
@@ -44,12 +44,12 @@ export function BuzzSetup({
   const [pushed, setPushed] = useState(false);
   const [pushErr, setPushErr] = useState<string | null>(null);
 
-  // Step 3 — wire
+  // Step 3: wire
   const [wiring, setWiring] = useState(false);
   const [wired, setWired] = useState(false);
   const [wireOut, setWireOut] = useState("");
 
-  // Step 4 — bridge
+  // Step 4: bridge
   const [targetUrl, setTargetUrl] = useState("");
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [bridgeMsg, setBridgeMsg] = useState<string | null>(null);
@@ -125,7 +125,7 @@ export function BuzzSetup({
     setBridgeMsg(
       r.ok
         ? install
-          ? "Background bridge installed — listens even when Studio is closed."
+          ? "Background bridge installed: listens even when Studio is closed."
           : "Bridge running (while Studio is open)."
         : ((r as { error?: string }).error ?? "Couldn't start the bridge."),
     );
@@ -158,7 +158,7 @@ export function BuzzSetup({
           ))}
         </div>
 
-        {/* Step 0 — explainer */}
+        {/* Step 0: explainer */}
         {step === 0 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -170,43 +170,43 @@ export function BuzzSetup({
               >
                 Buzz <IconExternal className="h-3 w-3" />
               </a>{" "}
-              treats agents as <strong>first-class members</strong> — your agent
+              treats agents as <strong>first-class members</strong>: your agent
               gets its own identity, profile, and audit trail in the workspace.
             </p>
             <ul className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">1. Identity</strong> — Studio
+                <strong className="text-text">1. Identity</strong>: Studio
                 generates a keypair; you admit it in your Buzz app.
               </li>
               <li>
-                <strong className="text-text">2. Profile</strong> — name, bio
+                <strong className="text-text">2. Profile</strong>: name, bio
                 and avatar, pushed into the workspace.
               </li>
               <li>
-                <strong className="text-text">3. Wire</strong> — credentials go
+                <strong className="text-text">3. Wire</strong>: credentials go
                 to Vercel and the channel file is written.
               </li>
               <li>
-                <strong className="text-text">4. Bridge</strong> — hosted Buzz
+                <strong className="text-text">4. Bridge</strong>: hosted Buzz
                 relays can't push events out yet, so a small local bridge
                 forwards messages to your deployed agent. Replies always come
                 from the deployed agent itself.
               </li>
               <li>
-                <strong className="text-text">5. Ship</strong> — deploy, then DM
+                <strong className="text-text">5. Ship</strong>: deploy, then DM
                 the agent in Buzz.
               </li>
             </ul>
           </div>
         ) : null}
 
-        {/* Step 1 — relay + identity */}
+        {/* Step 1: relay + identity */}
         {step === 1 ? (
           <div className="space-y-3">
             <div>
               <div className="mb-1 text-xs font-medium text-muted">
                 Relay URL{" "}
-                <span className="text-faint">— your workspace's Buzz relay</span>
+                <span className="text-faint">your workspace's Buzz relay</span>
               </div>
               <Input
                 className="font-mono text-[12px]"
@@ -267,13 +267,13 @@ export function BuzzSetup({
                     <div className="rounded-lg bg-success/10 px-3 py-2 text-[13px] text-success">
                       Admitted to the workspace
                       {member.channels
-                        ? ` — member of ${member.channels} channel(s).`
-                        : ". Channels come later — DM the agent or add it to a channel after deploy."}
+                        ? `, member of ${member.channels} channel(s).`
+                        : ". Channels come later. DM the agent or add it to a channel after deploy."}
                     </div>
                   ) : (
                     <div className="rounded-lg bg-warn/10 px-3 py-2 text-2xs text-warn">
                       {member.error ??
-                        "Not admitted yet — add the member in Buzz, then re-check."}
+                        "Not admitted yet. Add the member in Buzz, then re-check."}
                     </div>
                   )
                 ) : null}
@@ -282,7 +282,7 @@ export function BuzzSetup({
           </div>
         ) : null}
 
-        {/* Step 2 — profile */}
+        {/* Step 2: profile */}
         {step === 2 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -291,7 +291,7 @@ export function BuzzSetup({
             <div>
               <div className="mb-1 text-xs font-medium text-muted">
                 Display name{" "}
-                <span className="text-faint">— also wakes the agent on @mention</span>
+                <span className="text-faint">also wakes the agent on @mention</span>
               </div>
               <Input
                 onChange={(e) => setName(e.target.value)}
@@ -309,7 +309,7 @@ export function BuzzSetup({
             </div>
             <div>
               <div className="mb-1 text-xs font-medium text-muted">
-                Avatar <span className="text-faint">— PNG/JPEG, uploaded to the relay</span>
+                Avatar <span className="text-faint">PNG/JPEG, uploaded to the relay</span>
               </div>
               <input
                 accept="image/png,image/jpeg,image/webp"
@@ -357,7 +357,7 @@ export function BuzzSetup({
           </div>
         ) : null}
 
-        {/* Step 3 — wire */}
+        {/* Step 3: wire */}
         {step === 3 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -396,13 +396,13 @@ export function BuzzSetup({
           </div>
         ) : null}
 
-        {/* Step 4 — bridge */}
+        {/* Step 4: bridge */}
         {step === 4 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
               Hosted Buzz relays don't push events out yet, so a local bridge
               polls the relay and forwards DMs + @mentions to your deployed
-              agent. Replies come from the deployed agent — the bridge is
+              agent. Replies come from the deployed agent: the bridge is
               inbound-only.
             </p>
             <Input
@@ -418,7 +418,7 @@ export function BuzzSetup({
             />
             {!loadingUrl && !targetUrl ? (
               <p className="text-2xs text-faint">
-                No deployment yet — deploy first (next step), then come back and
+                No deployment yet. Deploy first (next step), then come back and
                 start the bridge, or paste the URL manually.
               </p>
             ) : null}
@@ -452,13 +452,13 @@ export function BuzzSetup({
             <p className="text-2xs text-faint">
               Self-hosted relay with workflow webhooks enabled? Skip the bridge
               and point a <span className="font-mono">call_webhook</span>{" "}
-              workflow at <span className="font-mono">/inbound</span> instead —
+              workflow at <span className="font-mono">/inbound</span> instead:
               the channel file serves either path.
             </p>
           </div>
         ) : null}
 
-        {/* Step 5 — ship */}
+        {/* Step 5: ship */}
         {step === 5 ? (
           <div className="space-y-3">
             <div className="rounded-lg bg-success/10 px-3 py-2 text-[13px] text-success">
@@ -466,11 +466,11 @@ export function BuzzSetup({
             </div>
             <ol className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">Deploy</strong> — the channel +
+                <strong className="text-text">Deploy</strong>: the channel +
                 credentials only take effect on the deployed agent.
               </li>
               <li>
-                <strong className="text-text">Test</strong> — DM{" "}
+                <strong className="text-text">Test</strong>: DM{" "}
                 <strong>{name || "the agent"}</strong> in Buzz, or @mention it
                 in a channel it's a member of.
               </li>

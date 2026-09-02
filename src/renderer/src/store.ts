@@ -141,7 +141,7 @@ export const useStore = create<State>((set, get) => ({
     try {
       set({ eveLatest: await window.studio.agents.eveLatest(force) });
     } catch {
-      // offline — keep whatever we had
+      // offline, keep whatever we had
     }
   },
 
@@ -196,7 +196,7 @@ export const useStore = create<State>((set, get) => ({
     set({ activeAgentId: id, activeThreadId: null });
     void get().loadStructure(id);
     await get().loadThreads(id);
-    // Only auto-open a live (non-archived) thread — never a hidden/archived one.
+    // Only auto-open a live (non-archived) thread, never a hidden/archived one.
     const first = (get().threads[id] ?? []).find((t) => !t.archived);
     if (first) {
       await get().selectThread(first.id);
@@ -211,6 +211,11 @@ export const useStore = create<State>((set, get) => ({
     try {
       const s = await window.studio.agents.structure(id, refresh);
       set((st) => ({ structure: { ...st.structure, [id]: s } }));
+      // An explicit reload usually follows an outside change (eve upgrade,
+      // `eve add`, git pull); re-read installed eve versions at the same time.
+      if (force) {
+        void get().refreshAgents();
+      }
     } finally {
       set((st) => ({
         structureLoading: { ...st.structureLoading, [id]: false },
@@ -337,8 +342,8 @@ export const useStore = create<State>((set, get) => ({
         ok: r.ok,
         text: r.ok
           ? r.status === "no_active_session"
-            ? "No active session to compact — send a message first."
-            : "Compaction requested — eve summarizes the context in place."
+            ? "No active session to compact. Send a message first."
+            : "Compaction requested: eve summarizes the context in place."
           : (r.error ?? `Compact failed (${r.status}).`),
       },
     });
@@ -358,8 +363,8 @@ export const useStore = create<State>((set, get) => ({
         ok: r.ok,
         text: r.ok
           ? r.status === "no_active_session"
-            ? "No active session to clear — send a message first."
-            : "Context cleared — the session keeps its id, tools and state."
+            ? "No active session to clear. Send a message first."
+            : "Context cleared: the session keeps its id, tools and state."
           : (r.error ?? `Clear failed (${r.status}).`),
       },
     });

@@ -5,10 +5,10 @@ import { IconCheck, IconExternal, IconRocket } from "../ui/icons";
 import { Button, Input, Modal, Spinner } from "../ui/kit";
 
 /**
- * Guided, end-to-end Twilio setup — mirrors the Telegram/Discord flow. Verify the
+ * Guided, end-to-end Twilio setup, mirrors the Telegram/Discord flow. Verify the
  * Account SID + Auth Token, pick which of the account's numbers is the bot and who
  * may reach it, save the credentials to Vercel + write the channel file, then
- * point the number's SMS + Voice webhooks at the deployed agent — all via the
+ * point the number's SMS + Voice webhooks at the deployed agent, all via the
  * Twilio API, no console hunting.
  */
 export function TwilioSetup({
@@ -23,7 +23,7 @@ export function TwilioSetup({
   const setSection = useStore((s) => s.setSection);
   const [step, setStep] = useState(0);
 
-  // Step 1 — credentials
+  // Step 1: credentials
   const [sid, setSid] = useState("");
   const [tokenVal, setTokenVal] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -32,17 +32,17 @@ export function TwilioSetup({
   } | null>(null);
   const [verifyErr, setVerifyErr] = useState<string | null>(null);
 
-  // Step 2 — number + allow-list
+  // Step 2: number + allow-list
   const [numbers, setNumbers] = useState<TwilioNumber[] | null>(null);
   const [phoneSid, setPhoneSid] = useState("");
   const [allowFrom, setAllowFrom] = useState("");
 
-  // Step 3 — save
+  // Step 3: save
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
-  // Step 4 — webhooks
+  // Step 4: webhooks
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [base, setBase] = useState("");
   const [registering, setRegistering] = useState(false);
@@ -106,7 +106,7 @@ export function TwilioSetup({
     } else {
       setSaveErr(
         !a.ok || !t.ok
-          ? "Couldn't save the credentials to Vercel — check you're linked."
+          ? "Couldn't save the credentials to Vercel. Check you're linked."
           : (w.error ?? "Couldn't write the channel file."),
       );
     }
@@ -170,7 +170,7 @@ export function TwilioSetup({
           ))}
         </div>
 
-        {/* Step 0 — explainer */}
+        {/* Step 0: explainer */}
         {step === 0 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -179,19 +179,19 @@ export function TwilioSetup({
             </p>
             <ul className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">1. Account</strong> — paste your
+                <strong className="text-text">1. Account</strong>: paste your
                 Account SID + Auth Token; Studio reads your numbers.
               </li>
               <li>
-                <strong className="text-text">2. Number</strong> — pick which
+                <strong className="text-text">2. Number</strong>: pick which
                 number is the bot and who's allowed to text/call it.
               </li>
               <li>
-                <strong className="text-text">3. Save</strong> — credentials to
+                <strong className="text-text">3. Save</strong>: credentials to
                 Vercel + the channel file, no env tab.
               </li>
               <li>
-                <strong className="text-text">4. Webhooks</strong> — point the
+                <strong className="text-text">4. Webhooks</strong>: point the
                 number's SMS + Voice webhooks at your deployed agent.
               </li>
             </ul>
@@ -203,7 +203,7 @@ export function TwilioSetup({
           </div>
         ) : null}
 
-        {/* Step 1 — credentials */}
+        {/* Step 1: credentials */}
         {step === 1 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -216,7 +216,7 @@ export function TwilioSetup({
               >
                 Twilio Console <IconExternal className="h-3 w-3" />
               </a>{" "}
-              home page — Account SID and Auth Token.
+              home page: Account SID and Auth Token.
             </p>
             <Input
               className="font-mono"
@@ -267,7 +267,7 @@ export function TwilioSetup({
                 <strong>
                   {verified.friendlyName || "your Twilio account"}
                 </strong>
-                {numbers ? ` — ${numbers.length} number(s) found.` : "."}
+                {numbers ? `: ${numbers.length} number(s) found.` : "."}
               </div>
             ) : null}
             {verifyErr ? (
@@ -276,7 +276,7 @@ export function TwilioSetup({
           </div>
         ) : null}
 
-        {/* Step 2 — number + allow-list */}
+        {/* Step 2: number + allow-list */}
         {step === 2 ? (
           <div className="space-y-3">
             {numbers && numbers.length > 0 ? (
@@ -285,7 +285,7 @@ export function TwilioSetup({
                   <div className="mb-1 text-xs font-medium text-muted">
                     Bot number{" "}
                     <span className="text-faint">
-                      — replies are sent from this
+                      replies are sent from this
                     </span>
                   </div>
                   <select
@@ -297,7 +297,7 @@ export function TwilioSetup({
                       <option key={n.sid} value={n.sid}>
                         {n.phoneNumber}
                         {n.friendlyName && n.friendlyName !== n.phoneNumber
-                          ? ` — ${n.friendlyName}`
+                          ? ` (${n.friendlyName})`
                           : ""}
                       </option>
                     ))}
@@ -307,7 +307,7 @@ export function TwilioSetup({
                   <div className="mb-1 text-xs font-medium text-muted">
                     Allowed senders{" "}
                     <span className="text-faint">
-                      — E.164, comma-separated (who may text/call)
+                      E.164, comma-separated (who may text/call)
                     </span>
                   </div>
                   <Input
@@ -317,21 +317,21 @@ export function TwilioSetup({
                     value={allowFrom}
                   />
                   <p className="mt-1 text-2xs text-faint">
-                    Required — the channel ignores anyone not listed. Add your
+                    Required: the channel ignores anyone not listed. Add your
                     own mobile to test.
                   </p>
                 </div>
               </>
             ) : (
               <div className="rounded-lg border border-border bg-subtle p-3 text-2xs text-muted">
-                No phone numbers on this account yet — buy one in the Twilio
+                No phone numbers on this account yet. Buy one in the Twilio
                 Console, then reopen this setup.
               </div>
             )}
           </div>
         ) : null}
 
-        {/* Step 3 — save */}
+        {/* Step 3: save */}
         {step === 3 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -370,7 +370,7 @@ export function TwilioSetup({
           </div>
         ) : null}
 
-        {/* Step 4 — webhooks */}
+        {/* Step 4: webhooks */}
         {step === 4 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -391,7 +391,7 @@ export function TwilioSetup({
             />
             {!loadingUrl && !base ? (
               <p className="text-2xs text-faint">
-                No deployment found yet — deploy first, then come back and set
+                No deployment found yet. Deploy first, then come back and set
                 the webhooks, or paste the base URL manually.
               </p>
             ) : null}
@@ -406,7 +406,7 @@ export function TwilioSetup({
                 </>
               ) : hook?.live ? (
                 <>
-                  <IconCheck className="h-3.5 w-3.5" /> Webhooks set — re-check
+                  <IconCheck className="h-3.5 w-3.5" /> Webhooks set. Re-check
                 </>
               ) : (
                 "Set SMS + Voice webhooks"

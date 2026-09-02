@@ -165,7 +165,7 @@ export function Model(): JSX.Element {
 
           <Field
             label="Model"
-            hint="Vercel AI Gateway id — provider/model · saved with eve set"
+            hint="Vercel AI Gateway id: provider/model · saved with eve set"
           >
             <Input
               value={model}
@@ -209,7 +209,7 @@ export function Model(): JSX.Element {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search 300+ gateway models — grok, kimi, glm, gemini…"
+                placeholder="Search 300+ gateway models: grok, kimi, glm, gemini…"
                 autoFocus
               />
               {query.trim() ? (
@@ -251,7 +251,7 @@ export function Model(): JSX.Element {
                   )}
                   {matches.length > 40 ? (
                     <div className="px-1 py-1 text-[10px] text-faint">
-                      +{matches.length - 40} more — keep typing to narrow.
+                      +{matches.length - 40} more: keep typing to narrow.
                     </div>
                   ) : null}
                 </div>
@@ -292,7 +292,7 @@ export function Model(): JSX.Element {
             <span>
               Routed through the Vercel AI Gateway. Any{" "}
               <span className="font-mono">provider/model</span> from the catalog
-              works — type it above. Saving runs{" "}
+              works: type it above. Saving runs{" "}
               <span className="font-mono">eve set --model … --reasoning …</span>{" "}
               (the same editor as the dev TUI's /model). Full catalog at
               vercel.com/ai-gateway/models · docs at https://eve.dev/docs.

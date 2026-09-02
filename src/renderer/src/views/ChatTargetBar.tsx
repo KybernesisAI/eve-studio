@@ -87,9 +87,9 @@ export function ChatTargetBar({ agentId }: { agentId: string }): JSX.Element {
             Studio talks to your <b className="text-text">production</b>{" "}
             deployment. In Vercel → Project → Settings → Deployment Protection →{" "}
             <b className="text-text">Protection Bypass for Automation</b>,
-            generate the secret and <b className="text-text">copy it</b> — it's
+            generate the secret and <b className="text-text">copy it</b>: it's
             a system var, not included in{" "}
-            <span className="font-mono">env pull</span> — then paste it below
+            <span className="font-mono">env pull</span>, then paste it below
             and Save. The OIDC token is read from{" "}
             <span className="font-mono">.env.local</span> automatically (Pull
             env in the Environment tab).
@@ -135,7 +135,7 @@ export function ChatTargetBar({ agentId }: { agentId: string }): JSX.Element {
               className={`text-2xs ${health.ok ? "text-success" : "text-danger"}`}
             >
               {health.ok
-                ? "Reachable ✓ — deployed chat is ready."
+                ? "Reachable ✓. Deployed chat is ready."
                 : (health.reason ?? `Failed (status ${health.status}).`)}
             </div>
           ) : null}

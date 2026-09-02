@@ -3,7 +3,7 @@ import { IconCheck } from "../ui/icons";
 import { Button, Input, Modal, Spinner } from "../ui/kit";
 
 /**
- * Standalone Buzz profile editor — change the agent's name, bio, or avatar
+ * Standalone Buzz profile editor, change the agent's name, bio, or avatar
  * without re-running the setup wizard. Prefills from the relay's current
  * kind:0 profile and pushes an updated one on save.
  */
@@ -50,7 +50,7 @@ export function BuzzProfileEdit({
       about: about.trim() || undefined,
       avatarData: avatarData || undefined,
       avatarMime: avatarMime || undefined,
-      // Retain the existing avatar when the user didn't pick a new one — kind:0
+      // Retain the existing avatar when the user didn't pick a new one, kind:0
       // is replace-all, so omitting it would wipe the current picture.
       currentPicture: currentPic || undefined,
     });
@@ -87,14 +87,14 @@ export function BuzzProfileEdit({
               </div>
             )}
             <p className="text-2xs leading-relaxed text-muted">
-              Changes push straight to the workspace — everyone sees them on the
+              Changes push straight to the workspace: everyone sees them on the
               next refresh.
             </p>
           </div>
           <div>
             <div className="mb-1 text-xs font-medium text-muted">
               Display name{" "}
-              <span className="text-faint">— also wakes the agent on @mention</span>
+              <span className="text-faint">also wakes the agent on @mention</span>
             </div>
             <Input onChange={(e) => setName(e.target.value)} value={name} />
           </div>
@@ -105,7 +105,7 @@ export function BuzzProfileEdit({
           <div>
             <div className="mb-1 text-xs font-medium text-muted">
               Avatar{" "}
-              <span className="text-faint">— leave empty to keep the current one</span>
+              <span className="text-faint">leave empty to keep the current one</span>
             </div>
             <input
               accept="image/png,image/jpeg,image/webp"

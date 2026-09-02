@@ -457,9 +457,9 @@ export function projectEvents(events: EveEvent[]): Projection {
           : "";
       system(`Compacting context${tokens}…`);
     } else if (e.type === "compaction.completed") {
-      system("Context compacted — a summary checkpoint replaced older history");
+      system("Context compacted: a summary checkpoint replaced older history");
     } else if (e.type === "context.cleared") {
-      system("Context cleared — history dropped, session kept");
+      system("Context cleared: history dropped, session kept");
     } else if (e.type === "session.failed") {
       closeStreaming();
       activeTurnId = null;

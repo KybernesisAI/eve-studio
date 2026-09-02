@@ -445,7 +445,7 @@ export function Chat(): JSX.Element {
           {chatStatus === "error" ? (
             <div className="rounded-lg bg-danger/10 px-3 py-2 text-xs leading-relaxed text-danger">
               {(activeThreadId && statusErrors[activeThreadId]) ||
-                "Turn failed — see the agent logs."}
+                "Turn failed. See the agent logs."}
             </div>
           ) : null}
           {notice ? (
@@ -478,7 +478,7 @@ export function Chat(): JSX.Element {
               onClick={cancel}
               disabled={cancelling}
               className="inline-flex items-center gap-1.5 rounded-full border border-border bg-canvas px-3 py-1 text-2xs text-muted transition-colors hover:border-border-strong hover:text-text disabled:opacity-60"
-              title="POST /eve/v1/session/:id/cancel — confirmed on the stream as turn.cancelled"
+              title="POST /eve/v1/session/:id/cancel: confirmed on the stream as turn.cancelled"
             >
               <IconStop className="h-3 w-3" />
               {cancelling ? "Cancelling…" : "Cancel turn"}

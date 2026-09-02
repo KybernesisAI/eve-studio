@@ -77,7 +77,7 @@ function NewSkillModal({
           </Field>
           <Field
             label="Description"
-            hint="routing hint — when should this load?"
+            hint="routing hint: when should this load?"
           >
             <Input
               value={description}

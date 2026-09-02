@@ -138,7 +138,7 @@ export function Hooks(): JSX.Element {
               </Button>
             }
           >
-            Hooks run observe-only side effects on every session event — audit,
+            Hooks run observe-only side effects on every session event: audit,
             metrics, alerting, persistence.
           </EmptyState>
         ) : (

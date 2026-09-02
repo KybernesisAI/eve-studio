@@ -19,7 +19,7 @@ function inviteUrl(appId: string): string {
 }
 
 /**
- * Guided, end-to-end Discord setup — mirrors the Telegram flow. Create the app +
+ * Guided, end-to-end Discord setup, mirrors the Telegram flow. Create the app +
  * bot and verify its token (which hands us the application id + public key), save
  * the credentials to Vercel + write the channel file + register the /ask command,
  * invite the bot to a server, then set + verify the interactions endpoint at the
@@ -37,19 +37,19 @@ export function DiscordSetup({
   const setSection = useStore((s) => s.setSection);
   const [step, setStep] = useState(0);
 
-  // Step 1 — bot token
+  // Step 1: bot token
   const [token, setToken] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<DiscordVerifyResult | null>(null);
   const [verifyErr, setVerifyErr] = useState<string | null>(null);
 
-  // Step 2 — credentials + channel file + command
+  // Step 2: credentials + channel file + command
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [cmdNote, setCmdNote] = useState<string | null>(null);
 
-  // Step 4 — interactions endpoint
+  // Step 4: interactions endpoint
   const [epUrl, setEpUrl] = useState("");
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [registering, setRegistering] = useState(false);
@@ -67,7 +67,7 @@ export function DiscordSetup({
       setVerified(null);
       setVerifyErr(
         r.error ??
-          "That token didn't return an application — check it's the Bot token.",
+          "That token didn't return an application. Check it's the Bot token.",
       );
     }
   };
@@ -115,7 +115,7 @@ export function DiscordSetup({
     } else {
       setSaveErr(
         !a.ok || !b.ok || !k.ok
-          ? "Couldn't save the credentials to Vercel — check you're linked."
+          ? "Couldn't save the credentials to Vercel. Check you're linked."
           : (w.error ?? "Couldn't write the channel file."),
       );
     }
@@ -179,7 +179,7 @@ export function DiscordSetup({
           ))}
         </div>
 
-        {/* Step 0 — explainer */}
+        {/* Step 0: explainer */}
         {step === 0 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -188,22 +188,22 @@ export function DiscordSetup({
             </p>
             <ul className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">1. Bot</strong> — create the app,
+                <strong className="text-text">1. Bot</strong>: create the app,
                 add a bot, paste its token. Studio reads the app id + public key
-                from it — no hunting for three secrets.
+                from it: no hunting for three secrets.
               </li>
               <li>
-                <strong className="text-text">2. Credentials</strong> — saved to
+                <strong className="text-text">2. Credentials</strong>: saved to
                 Vercel; the channel file +{" "}
                 <span className="font-mono">/ask</span> command are created for
                 you.
               </li>
               <li>
-                <strong className="text-text">3. Invite</strong> — add the bot
+                <strong className="text-text">3. Invite</strong>: add the bot
                 to your server.
               </li>
               <li>
-                <strong className="text-text">4. Endpoint</strong> — point
+                <strong className="text-text">4. Endpoint</strong>: point
                 Discord at your deployed agent; Discord verifies it on the spot.
               </li>
             </ul>
@@ -215,7 +215,7 @@ export function DiscordSetup({
           </div>
         ) : null}
 
-        {/* Step 1 — bot + token */}
+        {/* Step 1: bot + token */}
         {step === 1 ? (
           <div className="space-y-3">
             <ol className="space-y-1.5 text-[13px] text-muted">
@@ -269,7 +269,7 @@ export function DiscordSetup({
             </div>
             {verified ? (
               <div className="rounded-lg bg-success/10 px-3 py-2 text-[13px] text-success">
-                Connected to <strong>{verified.name}</strong> — read its app id
+                Connected to <strong>{verified.name}</strong>: read its app id
                 and public key.
               </div>
             ) : null}
@@ -279,7 +279,7 @@ export function DiscordSetup({
           </div>
         ) : null}
 
-        {/* Step 2 — credentials + channel file + command */}
+        {/* Step 2: credentials + channel file + command */}
         {step === 2 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -334,7 +334,7 @@ export function DiscordSetup({
           </div>
         ) : null}
 
-        {/* Step 3 — invite */}
+        {/* Step 3: invite */}
         {step === 3 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -359,13 +359,13 @@ export function DiscordSetup({
           </div>
         ) : null}
 
-        {/* Step 4 — interactions endpoint */}
+        {/* Step 4: interactions endpoint */}
         {step === 4 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
               Point Discord at your deployed agent (
               <span className="font-mono text-text">/eve/v1/discord</span>).
-              Discord verifies it immediately — this only works once the agent
+              Discord verifies it immediately: this only works once the agent
               is <strong>deployed</strong> with the credentials.
             </p>
             <Input
@@ -381,7 +381,7 @@ export function DiscordSetup({
             />
             {!loadingUrl && !epUrl ? (
               <p className="text-2xs text-faint">
-                No deployment found yet — deploy first (next step), then come
+                No deployment found yet. Deploy first (next step), then come
                 back to verify, or paste the URL manually.
               </p>
             ) : null}
@@ -396,7 +396,7 @@ export function DiscordSetup({
                 </>
               ) : ep?.live ? (
                 <>
-                  <IconCheck className="h-3.5 w-3.5" /> Endpoint verified —
+                  <IconCheck className="h-3.5 w-3.5" /> Endpoint verified:
                   re-check
                 </>
               ) : (

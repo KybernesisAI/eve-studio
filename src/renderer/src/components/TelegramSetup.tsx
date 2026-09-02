@@ -19,7 +19,7 @@ function webhookUrlFrom(base: string): string {
 }
 
 /**
- * Guided, end-to-end Telegram setup — the flow Studio was missing (it used to
+ * Guided, end-to-end Telegram setup, the flow Studio was missing (it used to
  * just write the file and tell you to set env vars in a tab that doesn't exist).
  * Walks through the four things that actually make Telegram work: create the bot
  * with BotFather + verify its token, save the credentials to Vercel and write the
@@ -37,20 +37,20 @@ export function TelegramSetup({
   const setSection = useStore((s) => s.setSection);
   const [step, setStep] = useState(0);
 
-  // Step 1 — bot token
+  // Step 1: bot token
   const [token, setToken] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<TelegramVerifyResult | null>(null);
   const [verifyErr, setVerifyErr] = useState<string | null>(null);
   const [botUsername, setBotUsername] = useState("");
 
-  // Step 2 — credentials + channel file
+  // Step 2: credentials + channel file
   const [secret] = useState(genSecret);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
-  // Step 3 — webhook
+  // Step 3: webhook
   const [hookUrl, setHookUrl] = useState("");
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [registering, setRegistering] = useState(false);
@@ -173,7 +173,7 @@ export function TelegramSetup({
           ))}
         </div>
 
-        {/* Step 0 — explainer */}
+        {/* Step 0: explainer */}
         {step === 0 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -182,21 +182,21 @@ export function TelegramSetup({
             </p>
             <ul className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">1. Bot</strong> — create it in
+                <strong className="text-text">1. Bot</strong>: create it in
                 BotFather and paste the token here. That's <em>who</em> messages
                 come from.
               </li>
               <li>
-                <strong className="text-text">2. Credentials</strong> — Studio
+                <strong className="text-text">2. Credentials</strong>: Studio
                 saves the token + a generated webhook secret to Vercel and
                 writes the channel file. No env tab, no copy-paste.
               </li>
               <li>
-                <strong className="text-text">3. Webhook</strong> — point
+                <strong className="text-text">3. Webhook</strong>: point
                 Telegram at your deployed agent so messages get delivered.
               </li>
               <li>
-                <strong className="text-text">4. Ship</strong> — deploy, then DM
+                <strong className="text-text">4. Ship</strong>: deploy, then DM
                 the bot to test.
               </li>
             </ul>
@@ -207,7 +207,7 @@ export function TelegramSetup({
           </div>
         ) : null}
 
-        {/* Step 1 — bot + token */}
+        {/* Step 1: bot + token */}
         {step === 1 ? (
           <div className="space-y-3">
             <ol className="space-y-1.5 text-[13px] text-muted">
@@ -280,7 +280,7 @@ export function TelegramSetup({
           </div>
         ) : null}
 
-        {/* Step 2 — credentials + channel file */}
+        {/* Step 2: credentials + channel file */}
         {step === 2 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -305,7 +305,7 @@ export function TelegramSetup({
               <div className="mb-1 text-xs font-medium text-muted">
                 Bot @username{" "}
                 <span className="text-faint">
-                  — so group @mentions wake this bot
+                  so group @mentions wake this bot
                 </span>
               </div>
               <Input
@@ -341,7 +341,7 @@ export function TelegramSetup({
           </div>
         ) : null}
 
-        {/* Step 3 — webhook */}
+        {/* Step 3: webhook */}
         {step === 3 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -362,7 +362,7 @@ export function TelegramSetup({
             />
             {!loadingUrl && !hookUrl ? (
               <p className="text-2xs text-faint">
-                No deployment found yet — deploy first (next step), then come
+                No deployment found yet. Deploy first (next step), then come
                 back and register, or paste the URL manually.
               </p>
             ) : null}
@@ -377,7 +377,7 @@ export function TelegramSetup({
                 </>
               ) : hook?.live ? (
                 <>
-                  <IconCheck className="h-3.5 w-3.5" /> Webhook live — re-check
+                  <IconCheck className="h-3.5 w-3.5" /> Webhook live. Re-check
                 </>
               ) : (
                 "Register webhook"
@@ -393,7 +393,7 @@ export function TelegramSetup({
               >
                 {hook.lastError
                   ? /401|403|unauthorized|forbidden/i.test(hook.lastError)
-                    ? `Registered, but Telegram is being blocked (${hook.lastError}) — this is Vercel Deployment Protection. Turn off Vercel Authentication for Production (Vercel → project → Settings → Deployment Protection), then re-check.`
+                    ? `Registered, but Telegram is being blocked (${hook.lastError}): this is Vercel Deployment Protection. Turn off Vercel Authentication for Production (Vercel → project → Settings → Deployment Protection), then re-check.`
                     : `Registered, but Telegram's last delivery failed: ${hook.lastError}. This usually clears once the agent is deployed with the channel + env.`
                   : `Webhook registered${hook.pending ? ` · ${hook.pending} update(s) queued` : ""}. Deploy the agent (with the channel + env) to start handling messages.`}
               </div>
@@ -404,7 +404,7 @@ export function TelegramSetup({
           </div>
         ) : null}
 
-        {/* Step 4 — ship */}
+        {/* Step 4: ship */}
         {step === 4 ? (
           <div className="space-y-3">
             <div className="rounded-lg bg-success/10 px-3 py-2 text-[13px] text-success">
@@ -412,12 +412,12 @@ export function TelegramSetup({
             </div>
             <ol className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">Deploy</strong> — Telegram only
+                <strong className="text-text">Deploy</strong>: Telegram only
                 reaches the deployed agent. The token + secret are already set
                 for production.
               </li>
               <li>
-                <strong className="text-text">Test</strong> — open{" "}
+                <strong className="text-text">Test</strong>: open{" "}
                 {verified?.username ? (
                   <a
                     className="inline-flex items-center gap-1 text-accent hover:underline"
@@ -435,7 +435,7 @@ export function TelegramSetup({
             </ol>
             {hook && !hook.live ? (
               <p className="text-2xs text-warn">
-                Heads up: the webhook isn't registered yet — after deploying,
+                Heads up: the webhook isn't registered yet. After deploying,
                 come back to the Webhook step (or Set up again) to register it.
               </p>
             ) : null}

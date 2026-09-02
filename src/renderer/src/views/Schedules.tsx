@@ -182,7 +182,7 @@ export function Schedules(): JSX.Element {
     setTestMsg({
       ok: r.ok,
       text: r.ok
-        ? `Fired “${name}” once — check where it delivers (e.g. your Slack DM). If it targets a channel, that only sends when the target env var is set locally too.`
+        ? `Fired “${name}” once. Check where it delivers (e.g. your Slack DM). If it targets a channel, that only sends when the target env var is set locally too.`
         : r.output,
     });
   };
@@ -274,7 +274,7 @@ export function Schedules(): JSX.Element {
                     title={s.name}
                     badge={s.hasRun ? <Badge tone="info">run()</Badge> : null}
                     desc={
-                      [human, s.markdown].filter(Boolean).join(" — ") ||
+                      [human, s.markdown].filter(Boolean).join(" · ") ||
                       undefined
                     }
                     onClick={() => setEditing(s.name)}

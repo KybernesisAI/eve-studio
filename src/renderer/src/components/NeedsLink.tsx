@@ -6,17 +6,17 @@ import { Console } from "../ui/Console";
 import { IconPlug } from "../ui/icons";
 import { Button, Kicker } from "../ui/kit";
 
-/** Terminal cursor/erase codes the CLI emits even under NO_COLOR — strip for display. */
+/** Terminal cursor/erase codes the CLI emits even under NO_COLOR, strip for display. */
 const stripAnsi = (s: string): string =>
   // eslint-disable-next-line no-control-regex
   s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\x1b[()][AB012]/g, "");
 
-/** The OAuth device URL the CLI prints — surfaced as a button for non-technical users. */
+/** The OAuth device URL the CLI prints, surfaced as a button for non-technical users. */
 const DEVICE_URL_RE = /(https?:\/\/vercel\.com\/oauth\/device\?\S+)/;
 
 /**
  * Shown in Chat when an agent has no model credential (not linked to Vercel).
- * Handles the whole no-terminal path: sign in to Vercel (browser OAuth — no email,
+ * Handles the whole no-terminal path: sign in to Vercel (browser OAuth, no email,
  * no terminal) → pick a team → link + pull the AI Gateway token.
  */
 export function NeedsLink({
@@ -53,7 +53,7 @@ export function NeedsLink({
     const rd = await window.studio.vercel.modelReadiness(agentId);
     setReady(rd);
     if (rd.hasCredential) {
-      return; // already linked — no need to probe Vercel auth/teams
+      return; // already linked: no need to probe Vercel auth/teams
     }
     const who = await window.studio.vercel.whoami(agentId);
     setAuth(who);
@@ -67,7 +67,7 @@ export function NeedsLink({
     void refresh();
   }, [refresh]);
 
-  // While the browser sign-in is in flight, poll whoami — the CLI writes the auth
+  // While the browser sign-in is in flight, poll whoami, the CLI writes the auth
   // once the user approves in the browser, so this is how we detect success.
   useEffect(() => {
     if (!signingIn) {
@@ -155,7 +155,7 @@ export function NeedsLink({
     setBusy(true);
     setErr(null);
     setOutput(
-      "Connecting to Vercel — creating/linking the project and pulling the AI Gateway credential…\n",
+      "Connecting to Vercel: creating/linking the project and pulling the AI Gateway credential…\n",
     );
     const r = await window.studio.vercel.link(agentId, team || undefined);
     setOutput(r.output);
@@ -172,8 +172,8 @@ export function NeedsLink({
     } else {
       setErr(
         r.ok
-          ? "Linking didn't produce a credential — check the output below."
-          : "Couldn't connect to Vercel — check the output below, then try again.",
+          ? "Linking didn't produce a credential. Check the output below."
+          : "Couldn't connect to Vercel. Check the output below, then try again.",
       );
     }
   };
@@ -183,7 +183,7 @@ export function NeedsLink({
       <div className="flex items-center gap-2.5 border-b border-border bg-success/[0.06] px-5 py-2.5">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
         <span className="text-[13px] text-text">
-          Connected to Vercel — the model can run now.{" "}
+          Connected to Vercel: the model can run now.{" "}
           <span className="text-muted">
             {runtime?.status === "running"
               ? "Restarted."
@@ -208,8 +208,8 @@ export function NeedsLink({
           </Kicker>
           <div className="text-[13px] leading-snug text-muted">
             {authed
-              ? "This agent's model runs through the Vercel AI Gateway — pick a team and connect. No terminal."
-              : "This agent's model runs through the Vercel AI Gateway. Sign in in your browser to continue — no email, no terminal."}
+              ? "This agent's model runs through the Vercel AI Gateway. Pick a team and connect. No terminal."
+              : "This agent's model runs through the Vercel AI Gateway. Sign in in your browser to continue: no email, no terminal."}
           </div>
         </div>
 
@@ -270,8 +270,8 @@ export function NeedsLink({
         <div className="mt-2.5">
           <div className="mb-1.5 text-2xs text-muted">
             {deviceUrl
-              ? "A Vercel sign-in page opened in your browser — approve it there. This updates automatically."
-              : "Opening the Vercel sign-in page in your browser — this updates automatically once you approve."}
+              ? "A Vercel sign-in page opened in your browser. Approve it there. This updates automatically."
+              : "Opening the Vercel sign-in page in your browser: this updates automatically once you approve."}
           </div>
           <Console
             text={stripAnsi(login.output)}

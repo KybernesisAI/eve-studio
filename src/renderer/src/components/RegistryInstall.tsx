@@ -55,7 +55,7 @@ export function useRegistryStream(): {
   };
 }
 
-/** "Restart the dev server" affordance — a button when it's running, else a hint. */
+/** "Restart the dev server" affordance, a button when it's running, else a hint. */
 export function RestartHint({
   agentId,
   what = "the change",
@@ -119,7 +119,7 @@ export function InstallOutcome({
         ) : null}
         {result.envVars && result.envVars.length > 0 ? (
           <div className="text-2xs leading-relaxed text-muted">
-            Added to <span className="font-mono text-text">.env.local</span> —
+            Added to <span className="font-mono text-text">.env.local</span>.
             fill in:{" "}
             {result.envVars.map((v) => (
               <span key={v} className="mr-1.5 font-mono text-text">
@@ -135,7 +135,7 @@ export function InstallOutcome({
             {result.nextCommand ? (
               <>
                 {" "}
-                —{" "}
+                and run{" "}
                 <span className="font-mono text-text">
                   {result.nextCommand}
                 </span>

@@ -69,6 +69,23 @@ function AgentWorkspace(): JSX.Element {
   const [prod, setProd] = useState<ProdInfo | null>(null);
   const [ready, setReady] = useState<ModelReadiness | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  // Re-read the agent list (installed eve versions, link state) whenever the
+  // window regains focus, so changes made in a terminal show up without a
+  // restart. Throttled so alt-tabbing does not hammer the filesystem.
+  useEffect(() => {
+    let last = 0;
+    const onFocus = (): void => {
+      const now = Date.now();
+      if (now - last < 5_000) {
+        return;
+      }
+      last = now;
+      void useStore.getState().refreshAgents();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
   useEffect(() => {
     if (activeAgentId) {
       window.studio.vercel
@@ -129,7 +146,7 @@ function AgentWorkspace(): JSX.Element {
                 <button
                   type="button"
                   onClick={() => setUpgradeOpen(true)}
-                  title={`eve ${eveLatest} is available — click to upgrade this agent`}
+                  title={`eve ${eveLatest} is available. Click to upgrade this agent`}
                   className="rounded-full bg-accent/10 px-2 py-[2px] text-[10px] text-accent transition-colors hover:bg-accent/20"
                 >
                   ↑ {eveLatest} available
@@ -139,7 +156,7 @@ function AgentWorkspace(): JSX.Element {
                 <button
                   type="button"
                   onClick={() => setSection("capabilities")}
-                  title="eve info reports discovery errors — the agent will not compile until they are fixed. Open Capabilities for details."
+                  title="eve info reports discovery errors. The agent will not compile until they are fixed. Open Capabilities for details."
                   className="rounded-full bg-danger/10 px-2 py-[2px] text-[10px] text-danger transition-colors hover:bg-danger/20"
                 >
                   {structure.diagnostics.errors} build{" "}
@@ -226,7 +243,7 @@ function AgentWorkspace(): JSX.Element {
               variant="secondary"
               size="sm"
               onClick={() => openDeploy("environment")}
-              title="This project isn't linked to Vercel yet — link it first"
+              title="This project isn't linked to Vercel yet. Link it first"
             >
               <IconPlug className="h-3.5 w-3.5" />
               Link &amp; deploy

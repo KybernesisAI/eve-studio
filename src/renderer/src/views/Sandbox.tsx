@@ -87,7 +87,7 @@ export function Sandbox(): JSX.Element {
                 </Button>
               }
             >
-              No sandbox is authored — the agent uses the framework default (a
+              No sandbox is authored: the agent uses the framework default (a
               /workspace bash env, best available backend). Add a sandbox.ts to
               pick a backend, seed files, or lock down the network.
             </EmptyState>

@@ -13,14 +13,14 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 }
 
 /* ------------------------------------------------------------------ *
- * Design language — "Deck"
+ * Design language, "Deck"
  *   · Space Mono for all metadata / labels (uppercase, tracked)
  *   · Geist for content and interactive labels
  *   · Layered flat surfaces + hairlines, not boxed cards
  *   · Monochrome; color reserved for live status only
  * ------------------------------------------------------------------ */
 
-/** Monospace uppercase eyebrow — the signature label of the app. */
+/** Monospace uppercase eyebrow, the signature label of the app. */
 export function Kicker({
   children,
   className,

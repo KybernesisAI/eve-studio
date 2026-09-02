@@ -201,7 +201,7 @@ export const IconKey = make(
   </>,
 );
 
-/** The Eve wordmark mark — three stacked bars (☰), as in the eve CLI banner. */
+/** The Eve wordmark mark, three stacked bars (☰), as in the eve CLI banner. */
 export function IconEve({
   className = "h-4 w-4",
 }: {

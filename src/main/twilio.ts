@@ -89,7 +89,7 @@ export async function twilioVerify(
   if (!/^AC[0-9a-f]{32}$/i.test(s)) {
     return {
       ok: false,
-      error: "That doesn't look like an Account SID — it starts with 'AC'.",
+      error: "That doesn't look like an Account SID: it starts with 'AC'.",
     };
   }
   const r = await twCall(s, t, "GET", `/Accounts/${s}.json`);
@@ -97,7 +97,7 @@ export async function twilioVerify(
     return {
       ok: false,
       error: /401|authenticate/i.test(r.error)
-        ? "Twilio rejected those credentials — double-check the Account SID and Auth Token from the console."
+        ? "Twilio rejected those credentials. Double-check the Account SID and Auth Token from the console."
         : r.error,
     };
   }

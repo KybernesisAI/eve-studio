@@ -12,7 +12,7 @@ function endpointUrlFrom(base: string): string {
 
 /**
  * Guided Microsoft Teams setup. Verify the Azure Bot credentials (App ID + client
- * secret) by minting a Bot Connector token — exactly what inbound Activities do —
+ * secret) by minting a Bot Connector token (exactly what inbound Activities do),
  * save them to Vercel + write the channel file, then hand the user the exact
  * messaging endpoint URL to paste into the Azure portal (Azure has no API to set
  * it, so this step is copy-paste rather than automatic).
@@ -29,7 +29,7 @@ export function TeamsSetup({
   const setSection = useStore((s) => s.setSection);
   const [step, setStep] = useState(0);
 
-  // Step 1 — credentials
+  // Step 1: credentials
   const [appId, setAppId] = useState("");
   const [password, setPassword] = useState("");
   const [tenantId, setTenantId] = useState("");
@@ -37,12 +37,12 @@ export function TeamsSetup({
   const [verified, setVerified] = useState<TeamsVerifyResult | null>(null);
   const [verifyErr, setVerifyErr] = useState<string | null>(null);
 
-  // Step 2 — save
+  // Step 2: save
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
-  // Step 3 — endpoint
+  // Step 3: endpoint
   const [endpoint, setEndpoint] = useState("");
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -105,7 +105,7 @@ export function TeamsSetup({
     } else {
       setSaveErr(
         !a.ok || !p.ok || !tenantOk
-          ? "Couldn't save the credentials to Vercel — check you're linked."
+          ? "Couldn't save the credentials to Vercel. Check you're linked."
           : (w.error ?? "Couldn't write the channel file."),
       );
     }
@@ -156,7 +156,7 @@ export function TeamsSetup({
           ))}
         </div>
 
-        {/* Step 0 — explainer */}
+        {/* Step 0: explainer */}
         {step === 0 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -165,15 +165,15 @@ export function TeamsSetup({
             </p>
             <ul className="space-y-1.5 text-[13px] text-muted">
               <li>
-                <strong className="text-text">1. Azure Bot</strong> — create it,
+                <strong className="text-text">1. Azure Bot</strong>: create it,
                 copy the App ID + a client secret, verify here.
               </li>
               <li>
-                <strong className="text-text">2. Save</strong> — credentials to
+                <strong className="text-text">2. Save</strong>: credentials to
                 Vercel + the channel file, no env tab.
               </li>
               <li>
-                <strong className="text-text">3. Endpoint</strong> — paste your
+                <strong className="text-text">3. Endpoint</strong>: paste your
                 agent's messaging endpoint into the Azure Bot.
               </li>
             </ul>
@@ -185,7 +185,7 @@ export function TeamsSetup({
           </div>
         ) : null}
 
-        {/* Step 1 — Azure Bot credentials */}
+        {/* Step 1: Azure Bot credentials */}
         {step === 1 ? (
           <div className="space-y-3">
             <ol className="space-y-1.5 text-[13px] text-muted">
@@ -236,7 +236,7 @@ export function TeamsSetup({
                   setTenantId(e.target.value);
                   setVerified(null);
                 }}
-                placeholder="Tenant ID (single-tenant only — optional)"
+                placeholder="Tenant ID (single-tenant only, optional)"
                 value={tenantId}
               />
               <Button
@@ -264,7 +264,7 @@ export function TeamsSetup({
             </div>
             {verified ? (
               <div className="rounded-lg bg-success/10 px-3 py-2 text-[13px] text-success">
-                Credentials valid — Azure issued a Bot Connector token.
+                Credentials valid. Azure issued a Bot Connector token.
               </div>
             ) : null}
             {verifyErr ? (
@@ -273,7 +273,7 @@ export function TeamsSetup({
           </div>
         ) : null}
 
-        {/* Step 2 — save */}
+        {/* Step 2: save */}
         {step === 2 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -321,7 +321,7 @@ export function TeamsSetup({
           </div>
         ) : null}
 
-        {/* Step 3 — endpoint */}
+        {/* Step 3: endpoint */}
         {step === 3 ? (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted">
@@ -361,7 +361,7 @@ export function TeamsSetup({
             </div>
             {!loadingUrl && !endpoint ? (
               <p className="text-2xs text-faint">
-                No deployment found yet — deploy first, then copy the endpoint
+                No deployment found yet. Deploy first, then copy the endpoint
                 here.
               </p>
             ) : null}

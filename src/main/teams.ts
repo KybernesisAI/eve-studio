@@ -59,7 +59,7 @@ export async function teamsVerify(
       error:
         desc ||
         data.error ||
-        "Azure rejected those credentials — check the App ID, client secret, and (for single-tenant bots) the tenant id.",
+        "Azure rejected those credentials. Check the App ID, client secret, and (for single-tenant bots) the tenant id.",
     };
   } catch (e) {
     const msg =

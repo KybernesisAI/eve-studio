@@ -72,7 +72,7 @@ function run(agentPath: string, args: string[], input?: string): CmdResult {
     if (res.error) {
       const msg =
         (res.error as NodeJS.ErrnoException).code === "ENOENT"
-          ? "Couldn't run Vercel — the runtime isn't ready yet. Try again in a moment."
+          ? "Couldn't run Vercel: the runtime isn't ready yet. Try again in a moment."
           : res.error.message;
       return { ok: false, output: msg };
     }
@@ -133,7 +133,7 @@ function runAsync(
       finish({
         ok: false,
         output:
-          `${out}\n(timed out after ${Math.round(timeoutMs / 1000)}s — the command may need a browser step; continue in Vercel Connect)`.trim(),
+          `${out}\n(timed out after ${Math.round(timeoutMs / 1000)}s: the command may need a browser step; continue in Vercel Connect)`.trim(),
       });
     }, timeoutMs);
     child.stdout?.on("data", (d) => {
@@ -146,7 +146,7 @@ function runAsync(
       clearTimeout(timer);
       const msg =
         (e as NodeJS.ErrnoException).code === "ENOENT"
-          ? "Couldn't run Vercel — the runtime isn't ready yet. Try again in a moment."
+          ? "Couldn't run Vercel: the runtime isn't ready yet. Try again in a moment."
           : e.message;
       finish({ ok: false, output: msg });
     });
@@ -384,7 +384,7 @@ export async function vercelProdAlias(
   if (!deployUrl) {
     return {
       ok: false,
-      error: ls.output || "No production deployment found — deploy first.",
+      error: ls.output || "No production deployment found. Deploy first.",
     };
   }
   const insp = await runAsync(agentPath, ["inspect", deployUrl], 60_000);
@@ -541,7 +541,7 @@ export function vercelConnectCreateStream(
       finish({
         ok: false,
         output:
-          `${out}\n(timed out — finish authorizing in the browser, then Refresh)`.trim(),
+          `${out}\n(timed out. Finish authorizing in the browser, then Refresh)`.trim(),
       });
     }, 300_000);
     const emit = (d: Buffer): void => {

@@ -73,7 +73,7 @@ function NewSubagentModal({
           </div>
           <p className="text-2xs leading-relaxed text-muted">
             The parent delegates to it by its name; the description is the
-            routing hint. It's its own agent root — add its own
+            routing hint. It's its own agent root. Add its own
             tools/skills/connections under the subagent folder. Restart the
             agent to load it.
           </p>
@@ -87,7 +87,7 @@ function NewSubagentModal({
         <div className="space-y-3 p-4">
           <Field
             label="Name"
-            hint="becomes subagents/<name>/ — unique vs tools"
+            hint="becomes subagents/<name>/, unique vs tools"
           >
             <Input
               value={name}
@@ -107,7 +107,7 @@ function NewSubagentModal({
               placeholder="Investigate a topic and gather sources before drafting."
             />
           </Field>
-          <Field label="Instructions" hint="optional — its system prompt">
+          <Field label="Instructions" hint="optional: its system prompt">
             <Textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
@@ -135,7 +135,7 @@ function NewSubagentModal({
 }
 
 /**
- * "Enable self-modification" — eve's experimental, development-only source
+ * "Enable self-modification", eve's experimental, development-only source
  * editing subagent (`eve add experimental/self-modification`).
  */
 function SelfModificationCard({
@@ -214,7 +214,7 @@ function SelfModificationCard({
         ) : tooOld ? (
           <span
             className="shrink-0 font-mono text-2xs text-warn"
-            title={`Needs eve ${MIN_EVE}+ — this agent runs eve ${eveVersion}. Upgrade from the header first.`}
+            title={`Needs eve ${MIN_EVE}+: this agent runs eve ${eveVersion}. Upgrade from the header first.`}
           >
             needs eve {MIN_EVE}+
           </span>
@@ -332,7 +332,7 @@ export function Subagents(): JSX.Element {
                 </Button>
               }
             >
-              Declared subagents are specialists the root delegates to — each
+              Declared subagents are specialists the root delegates to: each
               its own isolated agent with its own tools, skills, and memory.
             </EmptyState>
           </div>

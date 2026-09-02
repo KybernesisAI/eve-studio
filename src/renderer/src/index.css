@@ -74,7 +74,7 @@ kbd {
   background: rgba(0, 112, 243, 0.18);
 }
 
-/* Focus ring for keyboard users only — never on text fields (their
+/* Focus ring for keyboard users only, never on text fields (their
    container is the affordance; a blue ring on the composer looks wrong). */
 :focus-visible {
   outline: 2px solid rgba(0, 112, 243, 0.5);

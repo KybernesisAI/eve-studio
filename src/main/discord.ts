@@ -78,7 +78,7 @@ export async function discordVerify(
     return {
       ok: false,
       error: /401|unauthorized/i.test(r.error)
-        ? "That bot token was rejected — copy it from the Developer Portal → Bot → Reset Token."
+        ? "That bot token was rejected. Copy it from the Developer Portal → Bot → Reset Token."
         : r.error,
     };
   }
