@@ -222,7 +222,7 @@ export function NeedsLink({
                 value={team}
                 onChange={(e) => setTeam(e.target.value)}
                 disabled={busy}
-                title="Vercel team"
+                title="Vercel team. The model bills this team's AI Gateway, so pick one with billing set up."
                 className="no-drag shrink-0 rounded-lg border border-border bg-panel px-2.5 py-1.5 text-[13px] text-text outline-none hover:border-border-strong focus:border-border-strong"
               >
                 {teams.map((t) => (

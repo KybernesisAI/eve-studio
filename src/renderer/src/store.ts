@@ -288,6 +288,23 @@ export const useStore = create<State>((set, get) => ({
     const aid = get().activeAgentId;
     if (tid) {
       const target = aid ? (get().chatTarget[aid] ?? "local") : "local";
+      // Show the outgoing message at once. The server echoes it back as
+      // `message.received` only once the run is accepted, which on a cold
+      // production deployment can take a while; the projector drops the echo
+      // when it matches this provisional bubble.
+      set((st) => ({
+        events: {
+          ...st.events,
+          [tid]: [
+            ...(st.events[tid] ?? []),
+            {
+              type: "studio.user",
+              data: { message: text },
+              meta: { at: new Date().toISOString() },
+            },
+          ],
+        },
+      }));
       await window.studio.chat.send(tid, text, target);
     }
   },

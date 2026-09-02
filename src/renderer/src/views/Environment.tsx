@@ -64,6 +64,16 @@ function EnvEditor({ agentId }: { agentId: string }): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);
 
+  // A fresh agent has no env files until the link flow pulls them; keep
+  // looking so the editor fills in without leaving the tab.
+  useEffect(() => {
+    if (env && env.files.some((f) => f.content.trim().length > 0)) {
+      return;
+    }
+    const t = setInterval(() => void load(), 5_000);
+    return () => clearInterval(t);
+  }, [env, load]);
+
   const current = env?.files.find((f) => f.name === active);
   const dirty = current ? draft !== current.content : false;
 
@@ -174,6 +184,15 @@ function VercelPanel({ agentId }: { agentId: string }): JSX.Element {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // The link flow above changes this panel's state; re-check until linked.
+  useEffect(() => {
+    if (status?.linked) {
+      return;
+    }
+    const t = setInterval(() => void load(), 5_000);
+    return () => clearInterval(t);
+  }, [status, load]);
 
   const run = async (
     label: string,

@@ -114,6 +114,7 @@ export function projectEvents(events: EveEvent[]): Projection {
   let curAssistant: number | null = null;
   let curReasoning: number | null = null;
   let activeTurnId: string | null = null;
+  let pendingUser: string | null = null;
   let costUsd = 0;
   let inputTokens = 0;
   let outputTokens = 0;
@@ -171,9 +172,21 @@ export function projectEvents(events: EveEvent[]): Projection {
 
     if (e.type === "turn.started") {
       activeTurnId = typeof data.turnId === "string" ? data.turnId : null;
-    } else if (e.type === "message.received") {
+    } else if (e.type === "studio.user") {
+      // Provisional bubble pushed by the renderer at send time; the server's
+      // `message.received` echo for the same text replaces it silently.
       const text = typeof data.message === "string" ? data.message : "";
       if (text) {
+        blocks.push({ kind: "user", id: `u${n}`, text });
+        pendingUser = text;
+      }
+      curAssistant = null;
+      curReasoning = null;
+    } else if (e.type === "message.received") {
+      const text = typeof data.message === "string" ? data.message : "";
+      if (text && pendingUser === text) {
+        pendingUser = null; // already shown provisionally
+      } else if (text) {
         blocks.push({ kind: "user", id: `u${n}`, text });
       }
       curAssistant = null;
