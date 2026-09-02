@@ -28,9 +28,11 @@ export function useActiveStructure(): {
     id,
     structure,
     loading,
+    // Explicit reload re-runs `eve info --json` so the manifest is rebuilt
+    // from source even when no file mtime changed (e.g. a dependency install).
     reload: () => {
       if (id) {
-        void load(id, true);
+        void load(id, true, true);
       }
     },
   };

@@ -13,11 +13,8 @@ import {
   type AddAgentResult,
   type AgentRecord,
   type AppInfo,
-  type BrainInfo,
-  type DetectedBrain,
   IPC,
-  type WireBrainInput,
-  type WireBrainResult,
+  type RegistryAddResult,
 } from "../shared/ipc";
 import { AgentManager } from "./agentManager";
 import {
@@ -48,25 +45,17 @@ import {
   writeCapabilityFile,
 } from "./agentCapabilities";
 import { ensureNodeRuntime, ensureVercelShim } from "./runtime";
-import {
-  arcanaQuery,
-  arcanaStats,
-  arcanaTimeline,
-  arcanaValidate,
-} from "./arcana";
-import {
-  brainFromConnection,
-  detectBrain,
-  keyFromEnv,
-  wireBrain,
-} from "./arcanaWire";
+import { registerRegistryIpc } from "./registryIpc";
+import { registryAdd } from "./registry";
 import { ChatController } from "./chat";
 import {
-  addChannel,
   CliRunner,
+  eveLatestVersion,
+  eveSet,
   initAgent,
   listChannels,
   listEvals,
+  upgradeEve,
 } from "./cli";
 import { checkHealth, getAgentInfo, type SessionConn } from "./eveSession";
 import * as store from "./store";
@@ -101,7 +90,7 @@ import {
   buzzVerify,
 } from "./buzz";
 import { gatewayModels } from "./gateway";
-import { readStructure } from "./structure";
+import { refreshStructure } from "./structure";
 import {
   channelConnectors,
   deleteChannelFile,
@@ -115,7 +104,6 @@ import {
 import {
   vercelConnectAttach,
   vercelConnectCreate,
-  vercelBlobCreateStore,
   vercelConnectCreateStream,
   vercelConnectList,
   vercelConnectProjectsMap,
@@ -132,17 +120,6 @@ import {
   vercelWhoami,
 } from "./vercel";
 import { modelReadiness } from "./vercel";
-import {
-  applyProposal,
-  detectPatterns,
-  draftProposal,
-  getProposeTool,
-  listQueuedProposals,
-  type ProposalQueue,
-  resolveQueuedProposal,
-  setProposeTool,
-} from "./evolve";
-import type { EvolveProposal } from "../shared/ipc";
 
 /** Read a variable from an agent's .env.local (for deployed route auth). */
 function readEnvLocal(agentPath: string, name: string): string | null {
@@ -183,86 +160,6 @@ export interface IpcHandles {
   cli: CliRunner;
 }
 
-function brainInfo(cred: store.BrainCred | undefined): BrainInfo | null {
-  return cred
-    ? {
-        workspace: cred.workspace,
-        envVar: cred.envVar,
-        hasKey: Boolean(cred.key),
-      }
-    : null;
-}
-
-function requireBrain(agentId: string): store.BrainCred {
-  const cred = store.getBrain(agentId);
-  if (!cred) {
-    throw new Error("No brain configured for this agent.");
-  }
-  return cred;
-}
-
-/**
- * Resolve an agent's Arcana brain credential — a brain saved in Studio, else
- * detected from the agent's own Arcana connection + env key. Lets the proposal
- * queue work without the user separately wiring the brain in Studio.
- */
-function resolveBrainCred(agentId: string): store.BrainCred | null {
-  const saved = store.getBrain(agentId);
-  if (saved) {
-    return saved;
-  }
-  const path = agentPathOf(agentId);
-  const d = brainFromConnection(path);
-  if (d.workspace && d.envVar) {
-    const key = keyFromEnv(path, d.envVar);
-    if (key) {
-      return { workspace: d.workspace, envVar: d.envVar, key };
-    }
-  }
-  return null;
-}
-
-/**
- * Where to look for proposals the agent queued while deployed.
- *
- * @remarks
- * Mirrors the backend baked into the generated tool: an Arcana brain when the
- * agent has one, else Vercel Blob. The Blob token has to be the static
- * `BLOB_READ_WRITE_TOKEN` — Studio runs outside Vercel, where OIDC is refused —
- * and arrives via `vercel env pull`.
- */
-function resolveQueue(agentId: string): ProposalQueue | null {
-  const brain = resolveBrainCred(agentId);
-  if (brain) {
-    return { kind: "arcana", brain };
-  }
-  const token = keyFromEnv(agentPathOf(agentId), "BLOB_READ_WRITE_TOKEN");
-  return token ? { kind: "blob", token } : null;
-}
-
-/**
- * Whether the agent can actually queue a proposal raised while deployed.
- *
- * @remarks
- * The UI needs this up front: without somewhere to queue, an agent asked over
- * Slack to change itself can only report that it failed. Blob is the default
- * backend and needs a store — which Studio can create.
- */
-function proposeQueueStatus(agentId: string): {
-  backend: "arcana" | "blob";
-  ready: boolean;
-} {
-  const queue = resolveQueue(agentId);
-  if (queue) {
-    return { backend: queue.kind, ready: true };
-  }
-  const brain = brainFromConnection(agentPathOf(agentId));
-  return {
-    backend: brain.workspace && brain.envVar ? "arcana" : "blob",
-    ready: false,
-  };
-}
-
 function broadcast(channel: string, payload: unknown): void {
   for (const w of BrowserWindow.getAllWindows()) {
     w.webContents.send(channel, payload);
@@ -300,16 +197,7 @@ function addAgentFromPath(dir: string): AddAgentResult {
     // fall back to dir name
   }
 
-  let eveVersion: string | null = null;
-  try {
-    eveVersion = (
-      JSON.parse(
-        readFileSync(join(dir, "node_modules", "eve", "package.json"), "utf8"),
-      ) as { version: string }
-    ).version;
-  } catch {
-    // eve not installed here
-  }
+  const eveVersion = readEveVersion(dir);
 
   const id = hashPath(dir);
   const existing = store.getAgent(id);
@@ -325,6 +213,19 @@ function addAgentFromPath(dir: string): AddAgentResult {
   };
   store.upsertAgent(agent);
   return { ok: true, agent };
+}
+
+/** Installed eve version for an agent dir (`node_modules/eve/package.json`), or null. */
+function readEveVersion(dir: string): string | null {
+  try {
+    return (
+      JSON.parse(
+        readFileSync(join(dir, "node_modules", "eve", "package.json"), "utf8"),
+      ) as { version: string }
+    ).version;
+  } catch {
+    return null;
+  }
 }
 
 /** Registers every ipcMain handler. Returns handles so callers can clean up on quit. */
@@ -356,7 +257,56 @@ export function registerIpc(): IpcHandles {
   }));
 
   // --- agents ---
-  ipcMain.handle(IPC.agentsList, () => store.listAgents());
+  // Re-read each agent's installed eve version on every list so the header
+  // badge tracks `pnpm add eve@latest` instead of the version at add time.
+  ipcMain.handle(IPC.agentsList, () =>
+    store.listAgents().map((a) => {
+      const v = readEveVersion(a.path);
+      if (v !== a.eveVersion) {
+        const next = { ...a, eveVersion: v };
+        store.upsertAgent(next);
+        return next;
+      }
+      return a;
+    }),
+  );
+
+  // --- eve version / upgrade ---
+  ipcMain.handle(IPC.eveLatest, (_e: IpcMainInvokeEvent, force?: boolean) =>
+    eveLatestVersion(Boolean(force)),
+  );
+  ipcMain.handle(
+    IPC.eveUpgrade,
+    async (
+      _e: IpcMainInvokeEvent,
+      id: string,
+      runId: string,
+    ): Promise<import("../shared/ipc").EveUpgradeResult> => {
+      const a = store.getAgent(id);
+      if (!a) {
+        return { ok: false, version: null, error: "Unknown agent." };
+      }
+      // A running dev server would hold the old eve in memory; stop it so the
+      // next Start boots the upgraded runtime.
+      agents.stop(id);
+      try {
+        await ensureNodeRuntime((msg) =>
+          broadcast(IPC.cliChunk, { runId, data: msg }),
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        broadcast(IPC.cliChunk, { runId, data: `${msg}\n` });
+        broadcast(IPC.cliExit, { runId, code: -1 });
+        return { ok: false, version: readEveVersion(a.path), error: msg };
+      }
+      const result = await upgradeEve(a.path, (data) =>
+        broadcast(IPC.cliChunk, { runId, data }),
+      );
+      store.upsertAgent({ ...a, eveVersion: result.version });
+      broadcast(IPC.cliExit, { runId, code: result.ok ? 0 : 1 });
+      return result;
+    },
+  );
 
   ipcMain.handle(IPC.agentsAdd, async (): Promise<AddAgentResult> => {
     const win = BrowserWindow.getFocusedWindow() ?? undefined;
@@ -415,6 +365,7 @@ export function registerIpc(): IpcHandles {
             input.parentDir,
             input.name,
             Boolean(input.webChat),
+            input.model,
           );
         } catch (err) {
           broadcast(IPC.cliChunk, {
@@ -495,13 +446,18 @@ export function registerIpc(): IpcHandles {
     }
     return getAgentInfo(url);
   });
-  ipcMain.handle(IPC.agentStructure, (_e: IpcMainInvokeEvent, id: string) => {
-    const a = store.getAgent(id);
-    if (!a) {
-      throw new Error("Unknown agent.");
-    }
-    return readStructure(a.path);
-  });
+  ipcMain.handle(
+    IPC.agentStructure,
+    (_e: IpcMainInvokeEvent, id: string, refresh?: boolean) => {
+      const a = store.getAgent(id);
+      if (!a) {
+        throw new Error("Unknown agent.");
+      }
+      // `eve info --json` regenerates the manifest from source (no server
+      // boot); skipped when the manifest is already newer than agent/.
+      return refreshStructure(a.path, Boolean(refresh));
+    },
+  );
 
   // --- model / config ---
   ipcMain.handle(IPC.modelRead, (_e: IpcMainInvokeEvent, id: string) =>
@@ -509,14 +465,23 @@ export function registerIpc(): IpcHandles {
   );
   ipcMain.handle(
     IPC.modelWrite,
-    (
+    async (
       _e: IpcMainInvokeEvent,
       id: string,
       model: string,
       reasoning: string | null,
     ) => {
       try {
-        writeModelConfig(agentPathOf(id), model, reasoning);
+        const path = agentPathOf(id);
+        // `eve set` is the same editor the dev TUI's /model uses; it refuses
+        // defineDynamic / provider-SDK models, in which case Studio's regex
+        // writer gets a go (it throws the same "edit by hand" error if the
+        // model isn't a plain string either). `--reasoning provider-default`
+        // is what removes an authored reasoning field, so it is always sent.
+        const viaCli = await eveSet(path, model, reasoning);
+        if (!viaCli.ok) {
+          writeModelConfig(path, model, reasoning);
+        }
         return { ok: true };
       } catch (err) {
         return {
@@ -614,10 +579,25 @@ export function registerIpc(): IpcHandles {
   ipcMain.handle(IPC.channelsList, (_e: IpcMainInvokeEvent, id: string) =>
     listChannels(agentPathOf(id)),
   );
+  // Web Chat is a registry item in eve 0.49 (`eve channels add` is gone).
   ipcMain.handle(
     IPC.channelAdd,
-    (_e: IpcMainInvokeEvent, id: string, kind: "slack" | "web") =>
-      addChannel(agentPathOf(id), kind),
+    async (_e: IpcMainInvokeEvent, id: string): Promise<RegistryAddResult> => {
+      let output = "";
+      const r = await registryAdd(agentPathOf(id), "channel/web", {}, (line) => {
+        output += line;
+      });
+      const needsInput = r.status === "needs-input";
+      if (needsInput && r.nextCommand) {
+        output += `\nSetup needs input. Continue in a terminal:\n  ${r.nextCommand}\n`;
+      }
+      return {
+        ok: r.status === "done",
+        needsInput,
+        nextCommand: r.nextCommand,
+        output: output.trim(),
+      };
+    },
   );
   ipcMain.handle(
     IPC.channelWrite,
@@ -789,7 +769,7 @@ export function registerIpc(): IpcHandles {
         kind === "build"
           ? ["build"]
           : kind === "deploy"
-            ? ["deploy"]
+            ? ["deploy", "--non-interactive", "--yes"]
             : ["eval", ...(extra?.ids ?? []), "--json"];
       // eve deploy shells out to a bare `vercel`; re-assert the fallback shim on
       // PATH right before so it succeeds without any global Vercel install.
@@ -905,126 +885,8 @@ export function registerIpc(): IpcHandles {
       scanConnectorUsage(agentPathOf(id), uids),
   );
 
-  // --- arcana (memory) ---
-  ipcMain.handle(
-    IPC.arcanaDetect,
-    (_e: IpcMainInvokeEvent, id: string): DetectedBrain => {
-      const a = store.getAgent(id);
-      if (!a) {
-        throw new Error("Unknown agent.");
-      }
-      const detected = detectBrain(a.path, readStructure(a.path));
-      return { ...detected, saved: brainInfo(store.getBrain(id)) };
-    },
-  );
-
-  ipcMain.handle(
-    IPC.arcanaSaveBrain,
-    async (
-      _e: IpcMainInvokeEvent,
-      id: string,
-      input: {
-        workspace: string;
-        envVar: string;
-        key?: string;
-        fromEnv?: boolean;
-      },
-    ) => {
-      const a = store.getAgent(id);
-      if (!a) {
-        throw new Error("Unknown agent.");
-      }
-      const key = input.fromEnv
-        ? keyFromEnv(a.path, input.envVar)
-        : (input.key ?? null);
-      if (!key) {
-        return { ok: false, error: "No key found." };
-      }
-      const check = await arcanaValidate(input.workspace, key);
-      if (!check.ok) {
-        return { ok: false, error: check.error ?? "Validation failed." };
-      }
-      store.setBrain(id, {
-        workspace: input.workspace,
-        envVar: input.envVar,
-        key,
-      });
-      return { ok: true, info: brainInfo(store.getBrain(id)) };
-    },
-  );
-
-  ipcMain.handle(
-    IPC.arcanaForgetBrain,
-    (_e: IpcMainInvokeEvent, id: string) => {
-      store.deleteBrain(id);
-      return true;
-    },
-  );
-
-  ipcMain.handle(
-    IPC.arcanaValidate,
-    (_e: IpcMainInvokeEvent, workspace: string, key: string) =>
-      arcanaValidate(workspace, key),
-  );
-
-  ipcMain.handle(IPC.arcanaStats, (_e: IpcMainInvokeEvent, id: string) => {
-    const c = requireBrain(id);
-    return arcanaStats(c.workspace, c.key);
-  });
-  ipcMain.handle(
-    IPC.arcanaTimeline,
-    (_e: IpcMainInvokeEvent, id: string, limit?: number) => {
-      const c = requireBrain(id);
-      return arcanaTimeline(c.workspace, c.key, limit ?? 30);
-    },
-  );
-  ipcMain.handle(
-    IPC.arcanaQuery,
-    (_e: IpcMainInvokeEvent, id: string, q: string) => {
-      const c = requireBrain(id);
-      return arcanaQuery(c.workspace, c.key, q);
-    },
-  );
-
-  ipcMain.handle(
-    IPC.arcanaWire,
-    async (
-      _e: IpcMainInvokeEvent,
-      id: string,
-      input: WireBrainInput,
-    ): Promise<WireBrainResult> => {
-      const a = store.getAgent(id);
-      if (!a) {
-        throw new Error("Unknown agent.");
-      }
-      const check = await arcanaValidate(input.workspace, input.key);
-      if (!check.ok) {
-        return { ok: false, error: `Key rejected: ${check.error}` };
-      }
-      try {
-        const { files } = wireBrain(a.path, input);
-        store.setBrain(id, {
-          workspace: input.workspace,
-          envVar: input.envVar,
-          key: input.key,
-        });
-        // Real fix: if the agent is linked to Vercel, push the key to its env
-        // too, so the DEPLOYED agent has memory (deploys don't ship local .env).
-        let pushedToVercel = false;
-        if (vercelStatus(a.path).linked) {
-          pushedToVercel = (
-            await vercelEnvSetAll(a.path, input.envVar, input.key)
-          ).ok;
-        }
-        return { ok: true, files, pushedToVercel };
-      } catch (err) {
-        return {
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        };
-      }
-    },
-  );
+  // --- registry, memory slots, Arcana (eve 0.49) — see registryIpc.ts ---
+  registerRegistryIpc(ipcMain, { agentPathOf, broadcast });
 
   // --- chat ---
   ipcMain.handle(
@@ -1128,6 +990,88 @@ export function registerIpc(): IpcHandles {
       return true;
     },
   );
+  /** Resolve a thread's connection for a session control op. */
+  const threadConn = (
+    threadId: string,
+    target: "local" | "deployed",
+  ): SessionConn => {
+    const t = store.getThread(threadId);
+    if (!t) {
+      throw new Error("Unknown thread.");
+    }
+    return resolveConn(t.agentId, target);
+  };
+  const controlResult = async (
+    fn: () => Promise<{ ok: boolean; status: string }>,
+  ): Promise<{ ok: boolean; status: string; error?: string }> => {
+    try {
+      return await fn();
+    } catch (err) {
+      return {
+        ok: false,
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  };
+  ipcMain.handle(
+    IPC.chatCancel,
+    (
+      _e: IpcMainInvokeEvent,
+      threadId: string,
+      target: "local" | "deployed" = "local",
+      turnId?: string,
+    ) =>
+      controlResult(() =>
+        chat.cancelTurn(threadId, threadConn(threadId, target), turnId),
+      ),
+  );
+  ipcMain.handle(
+    IPC.chatCompact,
+    (
+      _e: IpcMainInvokeEvent,
+      threadId: string,
+      target: "local" | "deployed" = "local",
+    ) =>
+      controlResult(() =>
+        chat.compactContext(threadId, threadConn(threadId, target)),
+      ),
+  );
+  ipcMain.handle(
+    IPC.chatClear,
+    (
+      _e: IpcMainInvokeEvent,
+      threadId: string,
+      target: "local" | "deployed" = "local",
+    ) =>
+      controlResult(() =>
+        chat.clearContext(threadId, threadConn(threadId, target)),
+      ),
+  );
+  ipcMain.handle(
+    IPC.chatReset,
+    (
+      _e: IpcMainInvokeEvent,
+      threadId: string,
+      target: "local" | "deployed" = "local",
+    ) =>
+      controlResult(async () => {
+        // The agent may be unreachable (stopped, offline); the local cursor
+        // must still be dropped so the thread can start a fresh session.
+        let conn: SessionConn | null = null;
+        try {
+          conn = threadConn(threadId, target);
+        } catch {
+          conn = null;
+        }
+        if (!conn) {
+          chat.abort(threadId);
+          store.setCursor(threadId, { streamIndex: 0 });
+          return { ok: true, status: "no_active_session" };
+        }
+        return chat.resetSession(threadId, conn);
+      }),
+  );
 
   // --- deploy target / status ---
   ipcMain.handle(IPC.deployGet, (_e: IpcMainInvokeEvent, id: string) =>
@@ -1152,79 +1096,6 @@ export function registerIpc(): IpcHandles {
   );
   ipcMain.handle(IPC.gatewayModels, (_e: IpcMainInvokeEvent, id: string) =>
     gatewayModels(agentPathOf(id)),
-  );
-  ipcMain.handle(
-    IPC.evolveDraft,
-    (_e: IpcMainInvokeEvent, id: string, intent: string, timezone?: string) =>
-      draftProposal(agentPathOf(id), intent, timezone),
-  );
-  ipcMain.handle(
-    IPC.evolveApply,
-    (_e: IpcMainInvokeEvent, id: string, proposal: EvolveProposal) =>
-      applyProposal(agentPathOf(id), proposal, store.getBrain(id) ?? null),
-  );
-  ipcMain.handle(IPC.evolveDetect, (_e: IpcMainInvokeEvent, id: string) =>
-    detectPatterns(
-      agentPathOf(id),
-      store.listThreads(id).map((t) => t.title),
-      store.getBrain(id) ?? null,
-    ),
-  );
-  ipcMain.handle(
-    IPC.evolveGetProposeTool,
-    (_e: IpcMainInvokeEvent, id: string) => getProposeTool(agentPathOf(id)),
-  );
-  ipcMain.handle(
-    IPC.evolveSetProposeTool,
-    (_e: IpcMainInvokeEvent, id: string, enabled: boolean) =>
-      setProposeTool(agentPathOf(id), enabled),
-  );
-  ipcMain.handle(IPC.evolveQueueStatus, (_e: IpcMainInvokeEvent, id: string) =>
-    proposeQueueStatus(id),
-  );
-  ipcMain.handle(
-    IPC.evolveCreateQueueStore,
-    async (_e: IpcMainInvokeEvent, id: string) => {
-      const a = store.getAgent(id);
-      if (!a) {
-        return { ok: false, output: "Unknown agent." };
-      }
-      const r = await vercelBlobCreateStore(a.path, `${a.name}-proposals`);
-      // Only a token that actually landed locally means the inbox can read.
-      return r.ok && proposeQueueStatus(id).ready
-        ? r
-        : {
-            ok: false,
-            output:
-              r.output ||
-              "Store created, but no BLOB_READ_WRITE_TOKEN arrived — is the project linked to Vercel?",
-          };
-    },
-  );
-  ipcMain.handle(
-    IPC.evolveListProposals,
-    async (_e: IpcMainInvokeEvent, id: string) => {
-      const queue = resolveQueue(id);
-      if (!queue) {
-        return {
-          ok: false,
-          proposals: [],
-          error:
-            "Can't reach this agent's proposal queue. Deploy the agent, then run Pull env in the Deploy tab so Studio has its BLOB_READ_WRITE_TOKEN.",
-        };
-      }
-      return { ok: true, proposals: await listQueuedProposals(queue) };
-    },
-  );
-  ipcMain.handle(
-    IPC.evolveResolveProposal,
-    async (_e: IpcMainInvokeEvent, id: string, note: string) => {
-      const queue = resolveQueue(id);
-      if (queue) {
-        await resolveQueuedProposal(queue, note);
-      }
-      return { ok: true };
-    },
   );
   ipcMain.handle(
     IPC.vercelLink,

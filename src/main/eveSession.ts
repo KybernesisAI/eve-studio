@@ -1,9 +1,16 @@
 import type { EveEvent } from "../shared/ipc";
 
+/**
+ * Response of `POST /eve/v1/session` (create) and `POST /eve/v1/session/:id`
+ * (follow-up). Create returns `202 { ok, sessionId, status: "accepted" }` as
+ * soon as Workflow accepts the durable run; follow-ups reuse the session id.
+ * There is no continuation token on the wire any more (eve 0.49): sessions are
+ * addressed by their durable id only.
+ */
 export interface SessionResponse {
   sessionId: string;
-  continuationToken: string;
   ok?: boolean;
+  status?: string;
 }
 
 export interface InputResponse {
@@ -12,9 +19,9 @@ export interface InputResponse {
   text?: string;
 }
 
+/** Body for the message routes: exactly one of `message` | `inputResponses`. */
 export interface PostBody {
   message?: string;
-  continuationToken?: string;
   inputResponses?: InputResponse[];
 }
 
@@ -22,6 +29,29 @@ export interface PostBody {
 export interface SessionConn {
   baseUrl: string;
   headers?: Record<string, string>;
+}
+
+/**
+ * HTTP error from a session route, carrying eve's stable `code` when the body
+ * had one (e.g. `session_not_active` on a 409).
+ */
+export class SessionHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string | null,
+    detail: string,
+  ) {
+    super(`session ${status}${code ? ` (${code})` : ""}: ${detail}`);
+    this.name = "SessionHttpError";
+  }
+}
+
+/** True for eve's "unknown, terminal, or not-yet-active session" reply. */
+export function isSessionNotActive(err: unknown): boolean {
+  return (
+    err instanceof SessionHttpError &&
+    (err.code === "session_not_active" || err.status === 409)
+  );
 }
 
 /**
@@ -51,7 +81,7 @@ export async function checkHealth(
   }
 }
 
-/** GET /eve/v1/info — the running agent's runtime surface. */
+/** GET /eve/v1/info — the running agent's runtime surface (agent-info v4). */
 export async function getAgentInfo(
   baseUrl: string,
   headers?: Record<string, string>,
@@ -66,7 +96,30 @@ export async function getAgentInfo(
   return res.json();
 }
 
-/** POST /eve/v1/session (create) or /eve/v1/session/:id (continue). */
+async function readError(res: Response): Promise<SessionHttpError> {
+  const text = (await res.text()).slice(0, 400);
+  let code: string | null = null;
+  try {
+    const parsed = JSON.parse(text) as { code?: unknown; error?: unknown };
+    if (typeof parsed.code === "string") {
+      code = parsed.code;
+    }
+  } catch {
+    // plain-text body
+  }
+  return new SessionHttpError(res.status, code, text);
+}
+
+/**
+ * POST /eve/v1/session (create) or /eve/v1/session/:id (follow-up).
+ *
+ * @remarks
+ * Both `200` and `202` are success: `202 accepted` means Workflow queued the
+ * run and the command inbox may still be starting, so an immediate follow-up
+ * can 409 `session_not_active` — callers retry that with backoff instead of
+ * starting a new session. Follow-ups default to `turnPolicy: "steer"`: a
+ * message during an active turn cancels and replaces it.
+ */
 export async function postSession(
   conn: SessionConn,
   sessionId: string | null,
@@ -82,10 +135,66 @@ export async function postSession(
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
-    const detail = (await res.text()).slice(0, 200);
-    throw new Error(`session ${res.status}: ${detail}`);
+    throw await readError(res);
   }
-  return (await res.json()) as SessionResponse;
+  const parsed = (await res.json()) as Partial<SessionResponse>;
+  return {
+    sessionId: parsed.sessionId ?? sessionId ?? "",
+    ok: parsed.ok,
+    status: parsed.status,
+  };
+}
+
+export type SessionControl = "cancel" | "clear" | "compact" | "reset";
+
+/** Result of a session control route: `accepted`, `no_active_turn`, `no_active_session`, … */
+export interface ControlResponse {
+  ok: boolean;
+  status: string;
+  sessionId?: string;
+}
+
+/**
+ * POST /eve/v1/session/:id/{cancel|clear|compact|reset}.
+ *
+ * @remarks
+ * Cancel returns `202 accepted` (confirm on the stream as `turn.cancelled` →
+ * `session.waiting`) or `200 no_active_turn`. Compact emits
+ * `compaction.requested` / `compaction.completed` → `session.waiting`; clear
+ * emits `context.cleared` → `session.waiting`; reset terminally retires the
+ * id. All three report `no_active_session` when the target is already
+ * inactive — treated as success so callers can fire and forget.
+ */
+export async function controlSession(
+  conn: SessionConn,
+  sessionId: string,
+  op: SessionControl,
+  body?: { turnId?: string; reason?: string },
+): Promise<ControlResponse> {
+  const res = await fetch(
+    `${conn.baseUrl}/eve/v1/session/${sessionId}/${op}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", ...conn.headers },
+      body: JSON.stringify(body ?? {}),
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (!res.ok) {
+    throw await readError(res);
+  }
+  const text = await res.text();
+  let parsed: Partial<ControlResponse> = {};
+  try {
+    parsed = text ? (JSON.parse(text) as Partial<ControlResponse>) : {};
+  } catch {
+    // empty / non-JSON body — treat as accepted
+  }
+  return {
+    ok: parsed.ok ?? true,
+    status: parsed.status ?? (res.status === 202 ? "accepted" : "ok"),
+    sessionId: parsed.sessionId,
+  };
 }
 
 /** GET /eve/v1/session/:id/stream?startIndex=n — yields NDJSON events until the caller stops. */

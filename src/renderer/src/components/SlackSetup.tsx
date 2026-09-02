@@ -290,11 +290,13 @@ export function SlackSetup({
               <div className="text-xs text-danger">{targetErr}</div>
             ) : null}
             <p className="text-2xs text-faint">
-              Saved as a production env var. A schedule references it via{" "}
+              Saved as a production env var. A schedule handler delivers to it
+              via{" "}
               <span className="font-mono">
-                receive(slack, {"{"} target: {"{"} channelId {"}"} {"}"})
-              </span>{" "}
-              — the Evolve tab can generate that for you.
+                to(slack, {"{"} channelId {"}"}).send(message, {"{"} auth:
+                appAuth {"}"})
+              </span>
+              .
             </p>
           </div>
         ) : null}

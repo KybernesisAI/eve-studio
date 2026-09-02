@@ -86,13 +86,23 @@ export function Settings({ info }: { info: AppInfo | null }): JSX.Element {
           </section>
 
           <section className="space-y-2.5">
+            <Kicker>About</Kicker>
+            <p className="text-[13px] leading-relaxed text-muted">
+              Eve Studio is an independent open-source project by Kybernesis.
+              It is not an official Vercel product. Eve is Vercel's open-source
+              agent framework — docs at https://eve.dev/docs, integrations at
+              https://eve.dev/integrations. Agents need eve 0.49+ and Node 24.
+            </p>
+          </section>
+
+          <section className="space-y-2.5">
             <Kicker>Storage &amp; secrets</Kicker>
             <p className="text-[13px] leading-relaxed text-muted">
               Agents, chat threads, and Arcana brain keys are stored locally in
               this app's user-data directory. Brain keys are held in plain JSON
               for now — an OS-keychain vault is a planned hardening pass.
               Nothing leaves your machine except calls to the agents' own dev
-              servers and Arcana.
+              servers, Vercel, the eve registry, and Arcana.
             </p>
           </section>
         </div>

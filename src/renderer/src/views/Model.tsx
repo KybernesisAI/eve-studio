@@ -18,6 +18,7 @@ import {
  * the fast path. Keep them valid gateway ids.
  */
 const FAVORITES = [
+  "openai/gpt-5.6-luna-fast",
   "anthropic/claude-opus-4.8",
   "anthropic/claude-sonnet-5",
   "anthropic/claude-fable-5",
@@ -162,12 +163,15 @@ export function Model(): JSX.Element {
             </Card>
           ) : null}
 
-          <Field label="Model" hint="Vercel AI Gateway id — provider/model">
+          <Field
+            label="Model"
+            hint="Vercel AI Gateway id — provider/model · saved with eve set"
+          >
             <Input
               value={model}
               onChange={(e) => setModel(e.target.value)}
               disabled={!cfg?.editable}
-              placeholder="anthropic/claude-opus-4.8"
+              placeholder="openai/gpt-5.6-luna-fast"
               className="font-mono"
             />
           </Field>
@@ -288,8 +292,10 @@ export function Model(): JSX.Element {
             <span>
               Routed through the Vercel AI Gateway. Any{" "}
               <span className="font-mono">provider/model</span> from the catalog
-              works — type it above. Full catalog at
-              vercel.com/ai-gateway/models.
+              works — type it above. Saving runs{" "}
+              <span className="font-mono">eve set --model … --reasoning …</span>{" "}
+              (the same editor as the dev TUI's /model). Full catalog at
+              vercel.com/ai-gateway/models · docs at https://eve.dev/docs.
             </span>
           </div>
         </div>

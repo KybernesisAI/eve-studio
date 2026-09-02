@@ -12,7 +12,6 @@ import { create } from "zustand";
 /** Per-agent workspace tabs (plus the global "settings"). */
 export type Section =
   | "chat"
-  | "evolve"
   | "instructions"
   | "capabilities"
   | "integrations"
@@ -31,11 +30,17 @@ interface State {
   activeThreadId: string | null;
   events: Record<string, EveEvent[]>;
   status: Record<string, ChatStatus>;
+  /** Last error text per thread (set alongside `status: "error"`). */
+  statusError: Record<string, string>;
   structure: Record<string, AgentStructure>;
   structureLoading: Record<string, boolean>;
   chatTarget: Record<string, ChatTarget>;
   deployNonce: number;
   booted: boolean;
+  /** `eve@latest` on npm (null while unknown / offline). */
+  eveLatest: string | null;
+  /** Which Deploy sub-tab to show when the Deploy section opens. */
+  deploySub: "deploy" | "environment" | "sandbox";
 
   init: () => Promise<void>;
   setSection: (s: Section) => void;
@@ -45,7 +50,11 @@ interface State {
   startAgent: (id: string) => Promise<void>;
   stopAgent: (id: string) => Promise<void>;
   setActiveAgent: (id: string) => Promise<void>;
-  loadStructure: (id: string, force?: boolean) => Promise<void>;
+  /**
+   * Load the compiled structure. `force` bypasses the renderer cache;
+   * `refresh` additionally makes main re-run `eve info --json`.
+   */
+  loadStructure: (id: string, force?: boolean, refresh?: boolean) => Promise<void>;
   openAgentChat: (id: string) => Promise<void>;
   loadThreads: (agentId: string) => Promise<void>;
   newThread: (agentId: string) => Promise<void>;
@@ -60,6 +69,21 @@ interface State {
   ) => Promise<void>;
   setChatTarget: (agentId: string, target: ChatTarget) => void;
   bumpDeploy: () => void;
+  /** Refresh the npm `eve@latest` version (cached in main). */
+  loadEveLatest: (force?: boolean) => Promise<void>;
+  /** Jump to the Deploy section on a given sub-tab. */
+  openDeploy: (sub: "deploy" | "environment" | "sandbox") => void;
+  /** Cancel the active turn on the current thread (eve `/cancel`). */
+  cancelTurn: () => Promise<void>;
+  /** Summarize the current thread's context in place (eve `/compact`). */
+  compactContext: () => Promise<void>;
+  /** Drop the current thread's model history (eve `/clear`). */
+  clearContext: () => Promise<void>;
+  /** Retire the session and archive the thread locally (eve `/reset`). */
+  resetSession: () => Promise<void>;
+  /** Last control-op outcome for the active thread (transient notice). */
+  controlNotice: { threadId: string; text: string; ok: boolean } | null;
+  clearControlNotice: () => void;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -71,11 +95,14 @@ export const useStore = create<State>((set, get) => ({
   activeThreadId: null,
   events: {},
   status: {},
+  statusError: {},
   structure: {},
   structureLoading: {},
   chatTarget: {},
   deployNonce: 0,
   booted: false,
+  eveLatest: null,
+  deploySub: "deploy",
 
   init: async () => {
     if (get().booted) {
@@ -94,14 +121,31 @@ export const useStore = create<State>((set, get) => ({
         },
       })),
     );
-    window.studio.chat.onStatus(({ threadId, status }) =>
-      set((st) => ({ status: { ...st.status, [threadId]: status } })),
+    window.studio.chat.onStatus(({ threadId, status, error }) =>
+      set((st) => ({
+        status: { ...st.status, [threadId]: status },
+        statusError: {
+          ...st.statusError,
+          [threadId]: status === "error" ? (error ?? "Turn failed.") : "",
+        },
+      })),
     );
 
     await get().refreshAgents();
+    void get().loadEveLatest();
   },
 
   setSection: (s) => set({ section: s }),
+
+  loadEveLatest: async (force) => {
+    try {
+      set({ eveLatest: await window.studio.agents.eveLatest(force) });
+    } catch {
+      // offline — keep whatever we had
+    }
+  },
+
+  openDeploy: (sub) => set({ section: "deploy", deploySub: sub }),
 
   refreshAgents: async () => {
     const agents = await window.studio.agents.list();
@@ -159,13 +203,13 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  loadStructure: async (id, force) => {
+  loadStructure: async (id, force, refresh) => {
     if (!force && (get().structure[id] || get().structureLoading[id])) {
       return;
     }
     set((st) => ({ structureLoading: { ...st.structureLoading, [id]: true } }));
     try {
-      const s = await window.studio.agents.structure(id);
+      const s = await window.studio.agents.structure(id, refresh);
       set((st) => ({ structure: { ...st.structure, [id]: s } }));
     } finally {
       set((st) => ({
@@ -256,4 +300,93 @@ export const useStore = create<State>((set, get) => ({
     set((st) => ({ chatTarget: { ...st.chatTarget, [agentId]: target } })),
 
   bumpDeploy: () => set((st) => ({ deployNonce: st.deployNonce + 1 })),
+
+  controlNotice: null,
+  clearControlNotice: () => set({ controlNotice: null }),
+
+  cancelTurn: async () => {
+    const tid = get().activeThreadId;
+    const aid = get().activeAgentId;
+    if (!tid) {
+      return;
+    }
+    const target = aid ? (get().chatTarget[aid] ?? "local") : "local";
+    const r = await window.studio.chat.cancel(tid, target);
+    if (!r.ok) {
+      set({
+        controlNotice: {
+          threadId: tid,
+          ok: false,
+          text: r.error ?? `Cancel failed (${r.status}).`,
+        },
+      });
+    }
+  },
+
+  compactContext: async () => {
+    const tid = get().activeThreadId;
+    const aid = get().activeAgentId;
+    if (!tid) {
+      return;
+    }
+    const target = aid ? (get().chatTarget[aid] ?? "local") : "local";
+    const r = await window.studio.chat.compact(tid, target);
+    set({
+      controlNotice: {
+        threadId: tid,
+        ok: r.ok,
+        text: r.ok
+          ? r.status === "no_active_session"
+            ? "No active session to compact — send a message first."
+            : "Compaction requested — eve summarizes the context in place."
+          : (r.error ?? `Compact failed (${r.status}).`),
+      },
+    });
+  },
+
+  clearContext: async () => {
+    const tid = get().activeThreadId;
+    const aid = get().activeAgentId;
+    if (!tid) {
+      return;
+    }
+    const target = aid ? (get().chatTarget[aid] ?? "local") : "local";
+    const r = await window.studio.chat.clear(tid, target);
+    set({
+      controlNotice: {
+        threadId: tid,
+        ok: r.ok,
+        text: r.ok
+          ? r.status === "no_active_session"
+            ? "No active session to clear — send a message first."
+            : "Context cleared — the session keeps its id, tools and state."
+          : (r.error ?? `Clear failed (${r.status}).`),
+      },
+    });
+  },
+
+  resetSession: async () => {
+    const tid = get().activeThreadId;
+    const aid = get().activeAgentId;
+    if (!tid) {
+      return;
+    }
+    const target = aid ? (get().chatTarget[aid] ?? "local") : "local";
+    const r = await window.studio.chat.reset(tid, target);
+    if (!r.ok) {
+      set({
+        controlNotice: {
+          threadId: tid,
+          ok: false,
+          text: r.error ?? `Reset failed (${r.status}).`,
+        },
+      });
+      return;
+    }
+    // The session is retired; close the thread locally and start a fresh one.
+    await get().archiveThread(tid, true);
+    if (aid) {
+      await get().newThread(aid);
+    }
+  },
 }));

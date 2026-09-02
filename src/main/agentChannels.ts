@@ -145,31 +145,48 @@ export function writeChannel(
     if (existsSync(file)) {
       throw new Error(`channels/${slug}.ts already exists.`);
     }
+    const name = slug || "intake";
     writeFileSync(
       file,
       `import { defineChannel, GET, POST } from "eve/channels";
 
+/**
+ * ${name} — custom HTTP channel. Added by Eve Studio.
+ *
+ * Routes mount at the app root (the file name is not a prefix). Each
+ * conversation is a channel-local address — here the \`threadId\` path param —
+ * and \`from(address)\` starts or continues the session bound to it. Docs:
+ * https://eve.dev/docs/channels/custom
+ */
 export default defineChannel({
   routes: [
-    POST("/message", async (req, { send }) => {
-      const body = (await req.json()) as { message: string; token?: string };
-      const session = await send(body.message, {
+    POST("/${name}/threads/:threadId/messages", async (request, { from, params }) => {
+      const body = (await request.json()) as { message: string };
+      const session = await from(params.threadId).send(body.message, {
         auth: null,
-        continuationToken: body.token,
       });
       return Response.json({ sessionId: session.id });
     }),
-    GET("/sessions/:sessionId/stream", async (_req, { getSession, params }) => {
-      const session = getSession(params.sessionId);
-      const stream = await session.getEventStream();
-      return new Response(stream, {
-        headers: { "content-type": "application/x-ndjson; charset=utf-8" },
-      });
-    }),
+    POST("/${name}/threads/:threadId/cancel", async (_request, { from, params }) =>
+      Response.json(await from(params.threadId).cancel()),
+    ),
+    GET(
+      "/${name}/sessions/:sessionId/stream",
+      async (_request, { attachSession, params }) => {
+        const stream = await attachSession(params.sessionId).getEventStream();
+        return new Response(stream, {
+          headers: { "content-type": "application/x-ndjson; charset=utf-8" },
+        });
+      },
+    ),
   ],
   events: {
-    "message.completed"(_event, _channel, _ctx) {
-      // deliver the reply back to your surface
+    "message.completed"(eventData, _channel, ctx) {
+      // Deliver the reply back to your surface.
+      console.info("[${name}] reply", {
+        sessionId: ctx.session.id,
+        message: eventData.message,
+      });
     },
   },
 });
@@ -267,7 +284,8 @@ export default ${body};
  * outbound messages are signed kind:9 events submitted over REST with NIP-98
  * auth; inbound arrives on POST /inbound (delivered by a relay-side workflow on
  * relays that support push, or by Studio's local bridge on hosted relays that
- * don't). Requires the `nostr-tools` package in the agent.
+ * don't). Requires the `nostr-tools` package in the agent. Uses eve 0.49's
+ * custom channel API (`from(address).send`, `receive(input, { from })`).
  */
 const BUZZ_TEMPLATE = `import { createHash } from "node:crypto";
 import { defineChannel, POST } from "eve/channels";
@@ -285,15 +303,20 @@ interface BuzzTarget {
   channelId: string;
 }
 
-const buzzChannel = defineChannel({
-  state: { targetChannelId: null as string | null },
+/** Durable adapter state: where the reply for the current session goes. */
+interface BuzzState {
+  targetChannelId: string | null;
+}
+
+const buzzChannel = defineChannel<BuzzState, { state: BuzzState }, BuzzTarget>({
+  state: { targetChannelId: null },
 
   context(state) {
     return { state };
   },
 
   routes: [
-    POST("/inbound", async (req, { receive, waitUntil }) => {
+    POST<BuzzState>("/inbound", async (req, { from, waitUntil }) => {
       const secret = process.env.BUZZ_WEBHOOK_SECRET;
       if (!secret || req.headers.get("x-buzz-secret") !== secret) {
         return new Response("unauthorized", { status: 401 });
@@ -318,28 +341,28 @@ const buzzChannel = defineChannel({
       if (!channelId || !text) {
         return new Response("ignored", { status: 200 });
       }
+      // One session per Buzz channel: the channel id is the continuation
+      // address, so follow-ups in the same channel land in the same session.
       waitUntil(
-        receive(buzzChannel, {
-          message: text,
-          target: { channelId },
+        from(channelId).send(text, {
           auth: {
             authenticator: "buzz",
             principalType: "user",
             principalId: author || "unknown",
             attributes: { channelId, messageId: body.messageId ?? "" },
           },
+          state: { targetChannelId: channelId },
         }),
       );
       return Response.json({ ok: true });
     }),
   ],
 
-  async receive(input, { send }) {
-    const target = input.target as unknown as BuzzTarget;
-    return send(input.message, {
+  /** Cross-channel hand-off: \`to(buzz, { channelId }).send(...)\` from a schedule or route. */
+  async receive(input, { from }) {
+    return from(input.target.channelId).send(input.message, {
       auth: input.auth,
-      continuationToken: \`chat:\${target.channelId}\`,
-      state: { targetChannelId: target.channelId },
+      state: { targetChannelId: input.target.channelId },
     });
   },
 

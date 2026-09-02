@@ -1,11 +1,13 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentRuntimeState } from "../shared/ipc";
+import { eveBin } from "./cli";
 import { getFreePort } from "./ports";
 
 interface Running {
-  proc: ChildProcess;
+  /** Null when adopted from a recorded dev server we never spawned. */
+  proc: ChildProcess | null;
   port: number;
   status: AgentRuntimeState["status"];
   error: string | null;
@@ -19,6 +21,35 @@ type StatusListener = (state: AgentRuntimeState) => void;
 type LogListener = (agentId: string, data: string) => void;
 
 const DETACHED = process.platform !== "win32";
+
+/**
+ * Port of the dev server eve recorded for this app root, if the record exists
+ * and points at loopback. eve writes `{ url }` to `.eve/dev-server-state.v1.json`
+ * when a server becomes ready and removes it on clean shutdown; a stale
+ * record is harmless because the caller health-checks before adopting.
+ */
+function readRecordedDevServer(agentPath: string): number | null {
+  const p = join(agentPath, ".eve", "dev-server-state.v1.json");
+  if (!existsSync(p)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(p, "utf8")) as { url?: unknown };
+    if (typeof parsed.url !== "string") {
+      return null;
+    }
+    const u = new URL(parsed.url);
+    const loopback =
+      u.hostname === "127.0.0.1" ||
+      u.hostname === "localhost" ||
+      u.hostname === "[::1]" ||
+      u.hostname === "::1";
+    const port = Number(u.port);
+    return loopback && Number.isInteger(port) && port > 0 ? port : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Kill whatever is LISTENing on a loopback port (best-effort, POSIX). */
 function killPort(port: number): void {
@@ -107,8 +138,35 @@ export class AgentManager {
       return this.state(agentId);
     }
 
+    // A dev server for this agent may already be up (another terminal, a
+    // previous Studio run that lost track of it). eve records its last ready
+    // URL in `.eve/dev-server-state.v1.json`; adopt it only when it is
+    // loopback, healthy, not already owned by another agent entry here, and
+    // /eve/v1/info confirms it serves THIS app root — a stale record can point
+    // at a port since reused by a different agent's server.
+    const recorded = readRecordedDevServer(agentPath);
+    if (
+      recorded &&
+      !this.portInUse(recorded, agentId) &&
+      (await this.waitHealthy(recorded, 3000)) &&
+      (await this.servesAppRoot(recorded, agentPath))
+    ) {
+      const rec: Running = {
+        proc: null,
+        port: recorded,
+        status: "running",
+        error: null,
+        stopping: false,
+        adopted: true,
+        logs: [`[studio] adopted existing dev server on :${recorded}\n`],
+      };
+      this.running.set(agentId, rec);
+      this.emit(agentId);
+      return this.state(agentId);
+    }
+
     const port = await getFreePort();
-    const bin = this.resolveEveBin(agentPath);
+    const bin = eveBin(agentPath);
     const proc = spawn(
       bin.cmd,
       [...bin.pre, "dev", "--no-ui", "--port", String(port)],
@@ -249,7 +307,7 @@ export class AgentManager {
     const r = this.running.get(agentId);
     if (r) {
       const gone = new Promise<void>((res) => {
-        if (r.adopted) {
+        if (r.adopted || !r.proc) {
           res();
           return;
         }
@@ -282,6 +340,10 @@ export class AgentManager {
 
   /** Kill the child's whole process group (SIGTERM), falling back to the pid. */
   private killTree(r: Running): void {
+    if (!r.proc) {
+      killPort(r.port);
+      return;
+    }
     const pid = r.proc.pid;
     try {
       if (DETACHED && pid) {
@@ -291,6 +353,53 @@ export class AgentManager {
       }
     } catch {
       // already gone
+    }
+  }
+
+  /** True when another agent's record (spawned or adopted) already holds `port`. */
+  private portInUse(port: number, exceptAgentId: string): boolean {
+    for (const [id, r] of this.running) {
+      if (id !== exceptAgentId && r.port === port) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Confirm via `GET /eve/v1/info` (agent-info v4: `agent.appRoot`) that the
+   * server on `port` serves `agentPath`. Any failure — auth-gated route,
+   * unexpected shape, path mismatch — means "do not adopt".
+   */
+  private async servesAppRoot(
+    port: number,
+    agentPath: string,
+  ): Promise<boolean> {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/eve/v1/info`, {
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!res.ok) {
+        return false;
+      }
+      const info = (await res.json()) as {
+        agent?: { appRoot?: unknown; agentRoot?: unknown };
+      };
+      const remote =
+        typeof info.agent?.appRoot === "string" ? info.agent.appRoot : null;
+      if (!remote) {
+        return false;
+      }
+      const norm = (p: string): string => {
+        try {
+          return realpathSync(p);
+        } catch {
+          return p;
+        }
+      };
+      return norm(remote) === norm(agentPath);
+    } catch {
+      return false;
     }
   }
 
@@ -320,16 +429,5 @@ export class AgentManager {
       await new Promise((r) => setTimeout(r, 800));
     }
     return false;
-  }
-
-  private resolveEveBin(agentPath: string): { cmd: string; pre: string[] } {
-    const local = join(agentPath, "node_modules", ".bin", "eve");
-    if (existsSync(local)) {
-      return { cmd: local, pre: [] };
-    }
-    return {
-      cmd: process.platform === "win32" ? "npx.cmd" : "npx",
-      pre: ["eve"],
-    };
   }
 }

@@ -3,9 +3,29 @@ import { useCliRun } from "../lib/useCli";
 import { useStore } from "../store";
 import { Console } from "../ui/Console";
 import { IconFolder } from "../ui/icons";
-import { Button, Field, Input, Kicker, Modal } from "../ui/kit";
+import { Button, Field, Input, Kicker, Modal, cx } from "../ui/kit";
 
 const NAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
+
+/** eve 0.49's own default for `eve init` when `--model` is omitted. */
+const DEFAULT_MODEL = "openai/gpt-5.6-luna-fast";
+
+/**
+ * Curated AI Gateway ids offered at create time. The Model tab lists the full
+ * gateway catalog once the agent is linked; this is just the fast path.
+ */
+const MODELS = [
+  DEFAULT_MODEL,
+  "anthropic/claude-opus-4.8",
+  "anthropic/claude-sonnet-5",
+  "anthropic/claude-fable-5",
+  "openai/gpt-5.5",
+  "openai/gpt-5.6-sol",
+  "xai/grok-4.5",
+  "google/gemini-3-pro-preview",
+  "moonshotai/kimi-k3",
+  "zai/glm-5.2",
+];
 
 export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
   const refreshAgents = useStore((s) => s.refreshAgents);
@@ -13,6 +33,7 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
 
   const [parentDir, setParentDir] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [model, setModel] = useState(DEFAULT_MODEL);
   const [webChat, setWebChat] = useState(false);
   const [phase, setPhase] = useState<"form" | "running" | "done" | "error">(
     "form",
@@ -22,6 +43,7 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
   const finalized = useRef(false);
 
   const validName = NAME_RE.test(name);
+  const validModel = /^[a-z0-9-]+\/[a-z0-9._-]+$/i.test(model.trim());
 
   const pickDir = async (): Promise<void> => {
     const dir = await window.studio.dialog.pickDir();
@@ -31,13 +53,18 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
   };
 
   const create = async (): Promise<void> => {
-    if (!parentDir || !validName) {
+    if (!parentDir || !validName || !validModel) {
       return;
     }
     setPhase("running");
     finalized.current = false;
     await start(() =>
-      window.studio.agents.create({ parentDir, name, webChat }),
+      window.studio.agents.create({
+        parentDir,
+        name,
+        webChat,
+        model: model.trim(),
+      }),
     );
   };
 
@@ -59,7 +86,7 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
         const noProject = res.error?.includes("No package.json");
         setError(
           noProject
-            ? "Couldn't scaffold the agent — setup didn't finish. Check the log below and make sure you're online: Eve and its runtime download automatically on first use."
+            ? "Couldn't scaffold the agent — setup didn't finish. Check the log below and make sure you're online: eve@latest (0.49+) and a Node 24 runtime download automatically on first use."
             : (res.error ??
                 "Scaffolding finished but the agent could not be registered."),
         );
@@ -104,6 +131,32 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
             />
           </Field>
 
+          <Field label="Model" hint="AI Gateway id — change later in Instructions → Model">
+            <Input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder={DEFAULT_MODEL}
+              className="font-mono"
+            />
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {MODELS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setModel(m)}
+                  className={cx(
+                    "rounded-md border px-2 py-0.5 font-mono text-2xs transition-colors",
+                    model === m
+                      ? "border-text bg-text text-white"
+                      : "border-border text-muted hover:border-border-strong hover:text-text",
+                  )}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </Field>
+
           <label className="flex items-center gap-2 text-[13px] text-muted">
             <input
               type="checkbox"
@@ -118,9 +171,13 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
             <div className="rounded-lg border border-border bg-subtle px-3 py-2.5">
               <Kicker className="mb-1.5">Command</Kicker>
               <div className="font-mono text-2xs text-muted">
-                eve init {name}
+                eve init {name} --model {model.trim() || DEFAULT_MODEL}
                 {webChat ? " --channel-web-nextjs" : ""}
                 <span className="text-faint"> · in {parentDir}</span>
+              </div>
+              <div className="mt-1 text-2xs text-faint">
+                Installs eve@latest (0.49+); needs Node 24 (provisioned
+                automatically when missing).
               </div>
             </div>
           ) : null}
@@ -141,7 +198,7 @@ export function CreateAgent({ onClose }: { onClose: () => void }): JSX.Element {
             <Button
               variant="primary"
               onClick={create}
-              disabled={!parentDir || !validName}
+              disabled={!parentDir || !validName || !validModel}
             >
               Create agent
             </Button>

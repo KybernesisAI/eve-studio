@@ -3,6 +3,7 @@ import type {
   ChannelKind,
   ChannelWiring,
   DiscordStatus,
+  RegistryItem,
   TeamsStatus,
   TelegramStatus,
   TwilioStatus,
@@ -13,13 +14,24 @@ import { BuzzSetup } from "../components/BuzzSetup";
 import { ConnectorPicker } from "../components/ConnectorPicker";
 import { ConnectSetup } from "../components/ConnectSetup";
 import { DiscordSetup } from "../components/DiscordSetup";
+import {
+  GUIDED_CHANNELS,
+  RegistryDocsLink,
+  RegistryInstallModal,
+} from "../components/RegistryGallery";
 import { SlackSetup } from "../components/SlackSetup";
 import { TeamsSetup } from "../components/TeamsSetup";
 import { TelegramSetup } from "../components/TelegramSetup";
 import { TwilioSetup } from "../components/TwilioSetup";
 import { useStore } from "../store";
 import { Console } from "../ui/Console";
-import { IconPlus, IconRefresh, IconServer, IconTrash } from "../ui/icons";
+import {
+  IconChevronDown,
+  IconPlus,
+  IconRefresh,
+  IconServer,
+  IconTrash,
+} from "../ui/icons";
 import {
   Badge,
   Button,
@@ -174,14 +186,20 @@ function AddChannelModal({
     setBusy(true);
     setErr(null);
     if (cat.kind === "web") {
-      setOutput("$ eve channels add web\n");
-      const r = await window.studio.agents.channelAdd(agentId, "web");
+      setOutput("Installing channel/web from the eve registry…\n");
+      const r = await window.studio.agents.channelAdd(agentId);
       setBusy(false);
-      setOutput((o) => o + r.output);
+      setOutput(r.output);
       if (r.ok) {
         setDone({});
+      } else if (r.needsInput) {
+        setErr(
+          r.nextCommand
+            ? `Setup needs input — finish in a terminal: ${r.nextCommand}`
+            : "Setup needs input — finish it in a terminal with eve add channel/web.",
+        );
       } else {
-        setErr("Command failed — see output.");
+        setErr("Install failed — see output.");
       }
       return;
     }
@@ -329,8 +347,10 @@ function AddChannelModal({
           {cat.auth === "web" ? (
             <div className="rounded-lg border border-border bg-subtle p-3 text-2xs leading-relaxed text-muted">
               Runs{" "}
-              <span className="font-mono text-text">eve channels add web</span>{" "}
-              to scaffold a Next.js Web Chat app in the project.
+              <span className="font-mono text-text">
+                eve add channel/web --non-interactive --yes
+              </span>{" "}
+              to install the Next.js Web Chat app from the eve registry.
             </div>
           ) : null}
 
@@ -388,6 +408,11 @@ export function Channels(): JSX.Element {
   const [tm, setTm] = useState<TeamsStatus | null>(null);
   const [bz, setBz] = useState<import("@shared/ipc").BuzzStatus | null>(null);
   const [finishing, setFinishing] = useState<string | null>(null);
+  const [registryChannels, setRegistryChannels] = useState<
+    RegistryItem[] | null
+  >(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [installItem, setInstallItem] = useState<RegistryItem | null>(null);
   const [finishMsg, setFinishMsg] = useState<{
     name: string;
     ok: boolean;
@@ -437,6 +462,25 @@ export function Channels(): JSX.Element {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Registry channels without a guided wizard (Google Chat, WhatsApp, X, …).
+  useEffect(() => {
+    if (!id) {
+      return;
+    }
+    setRegistryChannels(null);
+    window.studio.registry
+      .list(id)
+      .then((r) =>
+        setRegistryChannels(
+          r.items.filter(
+            (it) =>
+              it.name.startsWith("channel/") && !GUIDED_CHANNELS.has(it.name),
+          ),
+        ),
+      )
+      .catch(() => setRegistryChannels([]));
+  }, [id]);
 
   /**
    * One-click completion for the deploy-then-verify step that env-webhook
@@ -665,7 +709,8 @@ export function Channels(): JSX.Element {
                                   <Badge>added</Badge>
                                 )
                               ) : (c.kind ?? c.name) === "buzz" ? (
-                                bz?.member && (bz.bridgeRunning || bz.bridgeInstalled) ? (
+                                bz?.member &&
+                                (bz.bridgeRunning || bz.bridgeInstalled) ? (
                                   <Badge tone="success">
                                     <StatusDot status="running" />
                                     connected to this agent
@@ -896,8 +941,104 @@ export function Channels(): JSX.Element {
               })}
             </div>
           </div>
+
+          {/* More channels from the registry (no guided wizard) */}
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              className="flex w-full items-center gap-1.5 text-left"
+            >
+              <IconChevronDown
+                className={cx(
+                  "h-3.5 w-3.5 text-faint transition-transform",
+                  !moreOpen && "-rotate-90",
+                )}
+              />
+              <Kicker>More channels from the eve registry</Kicker>
+              <span className="font-mono text-2xs text-faint">
+                {registryChannels === null ? "…" : registryChannels.length}
+              </span>
+            </button>
+            {moreOpen ? (
+              registryChannels === null ? (
+                <div className="flex items-center gap-2 px-3 py-3 text-2xs text-muted">
+                  <Spinner className="h-3.5 w-3.5" /> Reading the registry…
+                </div>
+              ) : registryChannels.length === 0 ? (
+                <div className="px-3 py-3 text-2xs text-muted">
+                  Nothing beyond the guided channels above.
+                </div>
+              ) : (
+                <>
+                  <p className="text-2xs leading-relaxed text-muted">
+                    Installed with{" "}
+                    <span className="font-mono text-text">eve add</span>; each
+                    item's own setup flow runs non-interactively, and anything
+                    it needs from you is shown as a command to finish in a
+                    terminal.
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {registryChannels.map((it) => {
+                      const kind = it.name.split("/")[1] ?? it.name;
+                      const added = present.has(kind);
+                      return (
+                        <div
+                          key={it.name}
+                          className="flex items-center gap-3 rounded-lg border border-border/70 px-3 py-3 transition-colors hover:border-border-strong hover:bg-black/[0.02]"
+                        >
+                          <Logo
+                            label={it.title || kind}
+                            color="#666666"
+                            className="h-8 w-8 text-[13px]"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-[13px] font-medium text-text">
+                                {it.title || kind}
+                              </span>
+                              <span className="truncate font-mono text-2xs text-faint">
+                                {it.name}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 line-clamp-2 text-2xs leading-snug text-muted">
+                              {it.description}
+                            </div>
+                            <div className="mt-1">
+                              <RegistryDocsLink item={it} />
+                            </div>
+                          </div>
+                          {added ? (
+                            <Badge>added</Badge>
+                          ) : (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              disabled={!id}
+                              onClick={() => setInstallItem(it)}
+                            >
+                              <IconPlus className="h-3.5 w-3.5" /> Install
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )
+            ) : null}
+          </div>
         </div>
       </div>
+
+      {installItem && id ? (
+        <RegistryInstallModal
+          agentId={id}
+          item={installItem}
+          onClose={() => setInstallItem(null)}
+          onInstalled={load}
+        />
+      ) : null}
 
       {add && id ? (
         <AddChannelModal

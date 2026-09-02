@@ -1,14 +1,16 @@
 # Eve Studio
 
-**A desktop control center for [Eve](https://vercel.com/eve) agents.** Run, chat with, build, wire up, and deploy every Eve agent on your machine — from one native app, without living in a terminal.
+**A desktop control center for [Eve](https://eve.dev) agents.** Run, chat with, build, wire up, and deploy every Eve agent on your machine from one native app, without living in a terminal.
 
-Eve Studio is an Electron app that discovers the Eve agents on your disk and gives each one a full workspace: **self-improvement** (Evolve), a chat console (local **and** deployed), a prompt/model editor, first-class editing for every capability (tools, skills, subagents, hooks, schedules), integrations (connections & channels), long-term memory, one-click Vercel deploys, and evals.
+Eve Studio is an Electron app that discovers the Eve agents on your disk and gives each one a full workspace: a chat console (local **and** deployed) with session controls, a prompt and model editor, first-class editing for every capability (tools, skills, subagents, hooks, schedules), integrations from the official eve registry plus guided wizards, long-term memory, one-click Vercel deploys, and evals.
+
+> **Eve Studio is an independent open-source project by [Kybernesis](https://kybernesis.ai). It is not an official Vercel product.** Eve is Vercel's open-source agent framework; "Eve" and "Vercel" are Vercel's.
 
 ![Eve Studio](docs/screenshot.png)
 
 **→ [evestudio.dev](https://evestudio.dev)** · signed & notarized macOS builds with an in-app auto-updater.
 
-> Status: early, macOS-first (`v0.3.0`). Built on the Eve **beta**.
+> Status: `v0.3.x`, macOS-first. Built for **eve 0.49+**.
 
 ---
 
@@ -16,23 +18,23 @@ Eve Studio is an Electron app that discovers the Eve agents on your disk and giv
 
 Point it at a folder that contains an Eve agent (or create a new one in-app) and you get, per agent:
 
-- **Evolve** — tell an agent to change *itself*, in plain English. Say it in the Evolve tab, in chat (Studio detects it), or DM the deployed agent on **Slack**. Studio drafts the change with the agent's *own* model, shows you the exact diff, and on your approval writes the files and **git-commits** them — a revert point per change. It routes intent to the right kind automatically: a new **skill**, **tool**, **schedule**, an `instructions.md` edit, or a **fact for memory**. Proposals raised from a deployed agent queue to a private **Vercel Blob** store by default (or an **Arcana** brain if one is wired), and Studio can create that store in a click. Nothing changes without your yes, and the agent stays base Eve — no self-editing at runtime.
-- **Chat** — a clean conversation console that streams the agent's turns, tool calls, subagent delegations, reasoning, and approval prompts. Talk to the **local dev server** or your **deployed production** agent from the same window. The composer bar shows the **model the session is running** alongside live token/cost. Threads live inline in the sidebar and can be **archived** so the list stays tidy.
-- **Instructions & Model** — edit the system prompt (`instructions.md`) directly, and pick the model from the **live AI Gateway catalog** — search 200+ chat models across Anthropic, OpenAI, xAI, Google, Moonshot, Z.ai, DeepSeek and more, right in the app. Set reasoning effort per agent too.
-- **Capabilities** — browse **tools, skills, subagents, and hooks**, scaffold new ones, and **open · edit · delete** their source files in an in-app editor (SKILL.md for skills; `agent.ts` + `instructions.md` for subagents).
-- **Integrations** — manage **connections** (MCP / OpenAPI) and **channels**, and wire Vercel **Connect** connectors.
-- **Memory** — see whether the agent is using Eve's native durable sessions or an external long-term brain ([Arcana](https://kybernesis.ai)), and wire it up.
+- **Chat** — a conversation console that streams the agent's turns, tool calls, subagent delegations, reasoning, approval prompts, compaction events, and cancellations or failures. Talk to the **local dev server** or your **deployed production** agent from the same window. Session controls in the composer: **Cancel turn**, **Compact context**, **Clear context**, and **Reset session**. The usage bar shows the model the session is running alongside live token and cost figures. Threads live in the sidebar and can be archived.
+- **Instructions & Model** — edit the system prompt (`instructions.md`) directly, and pick the model from the **live AI Gateway catalog**. Model and reasoning changes are written with `eve set --model … --reasoning …`, the same editor the Eve TUI uses. Reasoning effort: `provider-default`, `none`, `minimal`, `low`, `medium`, `high`, `xhigh`.
+- **Capabilities** — browse **tools, skills, subagents, and hooks**, scaffold new ones, and **open · edit · delete** their source files in an in-app editor. Capabilities contributed by a mounted extension are badged. Under Subagents, **Enable self-modification** installs Eve's experimental, development-only source-editing subagent so the agent can change its own files under `eve dev`.
+- **Integrations** — **Add from registry**: browse and search the official eve registry (channels, connections, extensions, memory providers, instrumentation) and install anything with `eve add`. Guided wizards remain for Slack, Discord, Telegram, Teams, Twilio, GitHub, Linear, and Buzz. Manage **connections** (MCP / OpenAPI), Vercel **Connect** connectors, and **channels**.
+- **Memory** — three layers in one tab: Eve's built-in session memory (durable sessions, compaction, `defineState`, the todo tool, the sandbox workspace); **memory slots** (`agent/memory/<slot>.ts`, file memory or Supermemory); and **Kybernesis Arcana**, an official eve integration installed as an extension for workspace-scoped long-term memory, with an in-app brain browser.
 - **Schedules** — view and create cron-driven jobs.
-- **Deploy** — link the agent to Vercel and ship to production in-app (no terminal), with logs, environment/secrets management, and a sandbox view.
+- **Deploy** — link the agent to Vercel and ship to production in-app with `eve deploy`, with logs, environment and secrets management, and a sandbox view.
 - **Evals** — run the agent's eval suite and read results.
+- **Keep eve current** — the header shows the agent's eve version with an **↑ latest available** chip when npm has a newer release, and a red **build errors** chip when `eve info` reports discovery errors. One click upgrades eve (and `@kybernesis/arcana` when present) with the agent's own package manager, re-runs `eve info --json`, and shows the diagnostics.
 
-The guiding principle: **a non-technical operator should never have to open a terminal.** Linking to Vercel, pulling env, pushing secrets, deploying, and editing capabilities all happen through the UI.
+The guiding principle: **a non-technical operator should never have to open a terminal.** Linking to Vercel, pulling env, pushing secrets, installing integrations, deploying, and editing capabilities all happen through the UI.
 
 ---
 
 ## How it works
 
-Eve is **filesystem-first**: an agent's capabilities are discovered from its directory layout (`agent/tools/*.ts`, `agent/skills/<name>/SKILL.md`, `agent/hooks/*.ts`, `agent/subagents/<id>/`, …). Eve Studio leans on that:
+Eve is **filesystem-first**: an agent's capabilities are discovered from its directory layout (`agent/tools/*.ts`, `agent/skills/<name>/SKILL.md`, `agent/hooks/*.ts`, `agent/subagents/<id>/`, `agent/memory/<slot>.ts`, `agent/extensions/<ns>.ts`, …). Eve Studio leans on that and on the Eve CLI:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -43,28 +45,31 @@ Eve is **filesystem-first**: an agent's capabilities are discovered from its dir
 ┌───────────────┴───────────────────────────▼─────────────────┐
 │  Main process (Electron / Node)                              │
 │  • spawns `eve dev` per agent, adopts existing servers       │
-│  • reads the compiled manifest for structure                 │
+│  • refreshes structure with `eve info --json` + manifest     │
 │  • authors / edits / deletes capability files on disk        │
-│  • drives the Vercel CLI (link, env, connect, deploy)        │
+│  • `eve add` (registry) · `eve set` (model) · `eve deploy`   │
+│  • drives the Vercel CLI (link, env, connect)                │
 └───────────────▲───────────────────────────┬─────────────────┘
                 │  HTTP  /eve/v1/session…    │  child processes
+                │  cancel · compact · clear  │
+                │  reset · stream            │
         ┌───────┴────────┐          ┌────────▼─────────┐
-        │  Eve dev server │          │  Vercel CLI / gh │
-        │  (local agent)  │          │  Blob · Gateway  │
+        │  Eve dev server │          │  eve CLI · Vercel │
+        │  (local agent)  │          │  CLI · AI Gateway │
         └─────────────────┘          └──────────────────┘
 ```
 
-- **Chat** talks to the Eve session HTTP API (`POST /eve/v1/session`, `GET …/stream`) — the same contract locally and against a deployed URL (with a Deployment Protection bypass header for protected deployments).
-- **Structure** (the tabs' contents) is read from Eve's compiled agent manifest, with the authored source (`agent.ts`, capability dirs) overlaid — so a model or capability you just changed shows immediately, even before the manifest is rebuilt.
-- **Evolve** drafts changes through the agent's own linked **AI Gateway** (its configured model), then writes real files with the same scaffolds Eve expects. Every apply is a git commit; edits/deletes are path-safe (nothing outside the agent directory is ever touched).
-- **Model catalog** is fetched live from the linked gateway's `/v1/models`, filtered to chat models — so the picker always reflects what's actually available.
-- **Deploy** shells out to the Vercel CLI for linking, env pull/push, connector management, and production deploys.
+- **Chat** talks to the Eve session HTTP API: `POST /eve/v1/session` to create, `POST /eve/v1/session/:id` for follow-ups and input responses, `POST …/:id/cancel|compact|clear|reset` for session controls, and `GET …/:id/stream` for the NDJSON event stream. The same contract works locally and against a deployed URL (with a Deployment Protection bypass header for protected deployments). Create returns as soon as Workflow accepts the run; Studio waits for `session.waiting` before sending a follow-up and retries a `409 session_not_active` with backoff.
+- **Structure** (the tabs' contents) is refreshed with `eve info --json`, which regenerates Eve's discovery and compiled manifest without booting a server. Studio reads channel routes, tools, skills, hooks, schedules, subagents, memory slots, and extension mounts from that manifest.
+- **Model** changes go through `eve set`. **Integrations** install through `eve add <item> --non-interactive --yes`, with the NDJSON progress streamed to the in-app console. **Deploy** runs `eve deploy --non-interactive --yes`.
+- **Model catalog** is fetched live from the linked gateway's `/v1/models`, filtered to chat models, so the picker always reflects what is actually available.
+- **Vercel** linking, env pull and push, and Connect connector management shell out to the Vercel CLI.
 
 ### Project layout
 
 ```
 src/
-  main/       Electron main — agent process mgmt, IPC, structure, authoring, Vercel
+  main/       Electron main — agent process mgmt, IPC, structure, authoring, registry, Vercel
   preload/    context-isolated bridge exposed as window.studio
   renderer/   React app — agent rail, per-agent tabs, chat, editors, ui kit
   shared/     IPC channel names + shared types
@@ -74,7 +79,7 @@ src/
 
 ## Getting started
 
-**Prerequisites:** Node ≥ 20 (24 recommended), [pnpm](https://pnpm.io), and at least one Eve agent on disk. For deploys, the [Vercel CLI](https://vercel.com/docs/cli) and [`gh`](https://cli.github.com) signed in.
+**Prerequisites:** Node **24** or newer (the packaged app provisions its own runtime), [pnpm](https://pnpm.io), and at least one Eve agent on disk or the intent to create one. Eve itself is installed on demand with `npx eve@latest`. For deploys, the [Vercel CLI](https://vercel.com/docs/cli) is run through `npx` and signed in from the app.
 
 ```bash
 pnpm install     # install dependencies
@@ -98,23 +103,23 @@ On first run, **Add existing** to point at an agent folder, or **Create new** to
 
 ---
 
-## About Eve & Vercel
+## About Eve
 
-Eve is Vercel's agent framework — filesystem-first, deploys as Vercel Functions, and integrates with the Vercel platform.
+Eve is Vercel's open-source agent framework. An agent is a folder, deploys as Vercel Functions with durable Workflow runs, and integrates with the Vercel platform.
 
-- **Eve on Vercel** — <https://vercel.com/eve>
-- **Eve (beta)** — <https://beta.eve.dev>
-- **Vercel docs** — <https://vercel.com/docs>
+- **Eve docs** — <https://eve.dev/docs>
+- **Eve integrations registry** — <https://eve.dev/integrations> (Arcana: <https://eve.dev/integrations/arcana>)
 - **Vercel AI Gateway** (model access) — <https://vercel.com/docs/ai-gateway>
-- **Vercel Blob** (agent file/image storage) — <https://vercel.com/docs/vercel-blob>
 - **Vercel CLI** — <https://vercel.com/docs/cli>
 - **Deployment Protection** (bypass for automation) — <https://vercel.com/docs/deployment-protection>
 
-Eve ships its own docs inside each agent's `node_modules/eve/docs/` (tools, skills, subagents, hooks, channels, connections, schedules, sandbox, evals) — the authoritative reference for authoring.
+Eve ships its own docs inside each agent's `node_modules/eve/docs/` (tools, skills, subagents, hooks, channels, connections, memory, extensions, schedules, sandbox, evals), the authoritative reference for authoring.
 
 ---
 
 ## Notes
 
 - macOS-first today. `.env*`, `node_modules`, and build output are gitignored; the app never stores or commits secrets (Vercel Connect connectors and OIDC tokens are used instead of keys where possible).
-- Not affiliated with Vercel. "Eve" and "Vercel" are Vercel's; this is an independent tool for working with Eve agents.
+- Slack and Buzz reach the **deployed** agent only; local dev is never reachable from those platforms.
+- Installing Arcana with `eve add extension/arcana` can fail with `dependency_install` on npm-managed projects whenever the published `@kybernesis/arcana` peer range does not cover the agent's eve version. Studio falls back to installing the package with your package manager and writing the mount itself. See [ROADMAP.md](ROADMAP.md).
+- Not affiliated with Vercel. This is an independent tool for working with Eve agents.

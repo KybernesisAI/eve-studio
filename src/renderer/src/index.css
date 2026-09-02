@@ -29,6 +29,19 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Monospace text must not ligate: Geist Mono turns "--" into a single glyph
+   that visually swallows the preceding space ("eve set--model"). */
+.font-mono,
+.font-spacemono,
+code,
+pre,
+kbd {
+  font-variant-ligatures: none;
+  font-feature-settings:
+    "liga" 0,
+    "calt" 0;
+}
+
 /* Frameless macOS title bar drag regions */
 .titlebar-drag,
 .drag {

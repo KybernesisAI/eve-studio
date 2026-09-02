@@ -1,20 +1,16 @@
-import { PROPOSE_TOOL_NAME } from "@shared/ipc";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ProposalReview } from "../components/ProposalReview";
 import { type Block, projectEvents } from "../lib/events";
-import { looksLikeEvolveIntent } from "../lib/evolveIntent";
 import { useActiveStructure } from "../lib/useStructure";
-import { useEvolve } from "../lib/useEvolve";
 import { useStore } from "../store";
 import {
   IconArrowUp,
   IconChat,
   IconExternal,
   IconPlus,
-  IconWand,
+  IconStop,
   IconWrench,
 } from "../ui/icons";
-import { Badge, Button, EmptyState, Modal, Spinner } from "../ui/kit";
+import { Badge, Button, EmptyState, Spinner } from "../ui/kit";
 import { NeedsLink } from "../components/NeedsLink";
 import { ChatTargetBar } from "./ChatTargetBar";
 
@@ -92,6 +88,7 @@ function BlockView({
           <IconWrench className="h-3.5 w-3.5 text-faint" />
           <span className="font-mono text-text">{block.name}</span>
           <Badge tone={tone}>{block.status}</Badge>
+          {block.partial ? <Badge tone="info">streaming</Badge> : null}
         </summary>
         <div className="space-y-1 px-2.5 pb-2">
           <pre className="overflow-x-auto rounded border border-border bg-subtle p-2 text-2xs text-muted">
@@ -118,6 +115,14 @@ function BlockView({
           <Badge tone={block.status === "completed" ? "accent" : "warn"}>
             {block.status}
           </Badge>
+          {block.childSessionId ? (
+            <span
+              className="truncate font-mono text-[10px] text-faint"
+              title="Child session id"
+            >
+              {block.childSessionId}
+            </span>
+          ) : null}
         </summary>
         {block.output !== undefined ? (
           <pre className="mx-2.5 mb-2 overflow-x-auto rounded border border-border bg-subtle p-2 text-2xs text-muted">
@@ -128,6 +133,16 @@ function BlockView({
     );
   }
   if (block.kind === "input") {
+    if (block.resolved) {
+      return (
+        <div className="rounded-lg border border-border bg-subtle px-3 py-2 text-[13px] text-muted">
+          <span className="text-text">{block.prompt}</span>
+          <span className="ml-2 font-spacemono text-[10px] uppercase tracking-wider text-faint">
+            {block.resolved}
+          </span>
+        </div>
+      );
+    }
     return (
       <div className="rounded-lg border border-warn/40 bg-warn/[0.06] p-3 text-[13px]">
         <div className="text-text">{block.prompt}</div>
@@ -154,11 +169,21 @@ function BlockView({
   if (block.kind === "auth") {
     return (
       <div className="rounded-lg border border-info/40 bg-info/[0.06] p-3 text-[13px]">
-        <div className="text-text">Sign in to {block.name}</div>
+        <div className="flex items-center gap-2 text-text">
+          Sign in to {block.name}
+          {block.outcome ? (
+            <Badge tone={block.outcome === "authorized" ? "success" : "warn"}>
+              {block.outcome}
+            </Badge>
+          ) : null}
+        </div>
         {block.instructions ? (
           <div className="mt-1 text-xs text-muted">{block.instructions}</div>
         ) : null}
-        {block.url ? (
+        {block.reason ? (
+          <div className="mt-1 text-xs text-muted">{block.reason}</div>
+        ) : null}
+        {block.url && !block.outcome ? (
           <a
             href={block.url}
             target="_blank"
@@ -169,7 +194,7 @@ function BlockView({
             Open sign-in
           </a>
         ) : null}
-        {block.userCode ? (
+        {block.userCode && !block.outcome ? (
           <div className="mt-2 font-mono text-xs text-muted">
             Code: {block.userCode}
           </div>
@@ -177,7 +202,123 @@ function BlockView({
       </div>
     );
   }
+  if (block.kind === "system") {
+    const cls =
+      block.tone === "danger"
+        ? "text-danger"
+        : block.tone === "warn"
+          ? "text-warn"
+          : "text-faint";
+    return (
+      <div
+        className={`flex items-center gap-2 font-spacemono text-[10px] uppercase tracking-[0.14em] ${cls}`}
+      >
+        <span className="h-px min-w-4 flex-1 bg-border" />
+        <span className="min-w-0 max-w-[80%] whitespace-pre-wrap break-words text-center normal-case tracking-normal">
+          {block.text}
+        </span>
+        <span className="h-px min-w-4 flex-1 bg-border" />
+      </div>
+    );
+  }
+  if (block.kind === "result") {
+    return (
+      <details className="overflow-hidden rounded-lg border border-border bg-panel text-xs" open>
+        <summary className="flex cursor-pointer select-none items-center gap-2 px-2.5 py-1.5">
+          <span className="text-text">structured result</span>
+          <Badge tone="accent">result.completed</Badge>
+        </summary>
+        <pre className="mx-2.5 mb-2 overflow-x-auto rounded border border-border bg-subtle p-2 text-2xs text-muted">
+          {json(block.result)}
+        </pre>
+      </details>
+    );
+  }
   return null;
+}
+
+/** ⋯ menu with the session controls eve exposes beside "send". */
+function SessionMenu({
+  disabled,
+  onCompact,
+  onClear,
+  onReset,
+}: {
+  disabled: boolean;
+  onCompact: () => void;
+  onClear: () => void;
+  onReset: () => void;
+}): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onDoc = (e: MouseEvent): void => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const item = (
+    label: string,
+    hint: string,
+    fn: () => void,
+    danger = false,
+  ): JSX.Element => (
+    <button
+      type="button"
+      onClick={() => {
+        setOpen(false);
+        fn();
+      }}
+      className={`flex w-full flex-col items-start rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-black/[0.04] ${
+        danger ? "text-danger" : "text-text"
+      }`}
+    >
+      <span className="text-[12.5px]">{label}</span>
+      <span className="text-[10.5px] text-faint">{hint}</span>
+    </button>
+  );
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        title="Session controls"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-faint transition-colors hover:bg-black/[0.05] hover:text-text disabled:opacity-40"
+      >
+        <span className="text-[16px] leading-none">⋯</span>
+      </button>
+      {open ? (
+        <div className="absolute bottom-10 right-0 z-20 w-64 space-y-0.5 rounded-lg border border-border bg-panel p-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.2)]">
+          {item(
+            "Compact context",
+            "Summarize history in place (POST /compact)",
+            onCompact,
+          )}
+          {item(
+            "Clear context",
+            "Drop model history, keep the session (POST /clear)",
+            onClear,
+          )}
+          {item(
+            "Reset session",
+            "Retire the session and archive this thread (POST /reset)",
+            onReset,
+            true,
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function Chat(): JSX.Element {
@@ -187,38 +328,24 @@ export function Chat(): JSX.Element {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const events = useStore((s) => s.events);
   const statusMap = useStore((s) => s.status);
+  const statusErrors = useStore((s) => s.statusError);
   const newThread = useStore((s) => s.newThread);
   const send = useStore((s) => s.send);
   const respond = useStore((s) => s.respond);
+  const cancelTurn = useStore((s) => s.cancelTurn);
+  const compactContext = useStore((s) => s.compactContext);
+  const clearContext = useStore((s) => s.clearContext);
+  const resetSession = useStore((s) => s.resetSession);
+  const controlNotice = useStore((s) => s.controlNotice);
+  const clearControlNotice = useStore((s) => s.clearControlNotice);
   const chatTargetMap = useStore((s) => s.chatTarget);
 
   const [draft, setDraft] = useState("");
+  const [cancelling, setCancelling] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const ev = useEvolve(activeAgentId);
   const { structure } = useActiveStructure();
   const model = structure?.model ?? null;
-  const [evolveOpen, setEvolveOpen] = useState(false);
-  const [evolveText, setEvolveText] = useState("");
-
-  const openEvolve = (): void => {
-    const text = draft.trim();
-    if (!text) {
-      return;
-    }
-    setEvolveText(text);
-    setEvolveOpen(true);
-    void ev.draft(text);
-  };
-
-  const closeEvolve = (): void => {
-    if (ev.result?.ok) {
-      setDraft("");
-    }
-    ev.reset();
-    setEvolveOpen(false);
-  };
-  const handledProposals = useRef<Set<string>>(new Set());
 
   const threadEvents = activeThreadId ? (events[activeThreadId] ?? []) : [];
   const projection = useMemo(() => projectEvents(threadEvents), [threadEvents]);
@@ -229,28 +356,11 @@ export function Chat(): JSX.Element {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [projection.blocks]);
 
-  // Catch the agent's own `propose_change` tool call in the live stream and open
-  // the same diff/approve flow, seeded from what it proposed.
   useEffect(() => {
-    for (const b of projection.blocks) {
-      if (b.kind !== "tool" || b.name !== PROPOSE_TOOL_NAME) {
-        continue;
-      }
-      if (handledProposals.current.has(b.callId)) {
-        continue;
-      }
-      const intent = (b.input as { intent?: string } | null)?.intent?.trim();
-      if (!intent) {
-        continue;
-      }
-      handledProposals.current.add(b.callId);
-      setEvolveText(intent);
-      setEvolveOpen(true);
-      void ev.draft(intent);
-      break;
+    if (!streaming) {
+      setCancelling(false);
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: only react to new stream blocks; ev handlers are stable
-  }, [projection.blocks]);
+  }, [streaming]);
 
   if (!activeAgentId) {
     return <div className="flex-1" />;
@@ -261,36 +371,31 @@ export function Chat(): JSX.Element {
   const target = chatTargetMap[activeAgentId] ?? "local";
   const ready = target === "deployed" ? true : running;
   const agentName = agents.find((a) => a.id === activeAgentId)?.name ?? "Agent";
+  const contextWindow = 200_000;
 
-  const submit = (asMessage = false): void => {
+  const submit = (): void => {
     const text = draft.trim();
     if (!text || streaming || !ready || !activeThreadId) {
-      return;
-    }
-    // A self-change request goes to the approval flow, not the agent — the agent
-    // can't edit itself, so sending it there just gets a refusal.
-    if (!asMessage && looksLikeEvolveIntent(text)) {
-      openEvolve();
       return;
     }
     setDraft("");
     void send(text);
   };
 
-  // Escape hatch from the Evolve modal: send the text as a normal message.
-  const sendAsMessage = (): void => {
-    const text = draft.trim();
-    setEvolveOpen(false);
-    ev.reset();
-    setDraft("");
-    if (text && ready && activeThreadId) {
-      void send(text);
+  const cancel = (): void => {
+    if (!streaming) {
+      return;
     }
+    setCancelling(true);
+    void cancelTurn();
   };
 
   const canSend =
     !streaming && draft.trim().length > 0 && ready && !!activeThreadId;
-  const showEvolveChip = ready && !streaming && looksLikeEvolveIntent(draft);
+  const notice =
+    controlNotice && controlNotice.threadId === activeThreadId
+      ? controlNotice
+      : null;
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -338,8 +443,27 @@ export function Chat(): JSX.Element {
             ))
           )}
           {chatStatus === "error" ? (
-            <div className="text-xs text-danger">
-              Turn failed — see the agent logs.
+            <div className="rounded-lg bg-danger/10 px-3 py-2 text-xs leading-relaxed text-danger">
+              {(activeThreadId && statusErrors[activeThreadId]) ||
+                "Turn failed — see the agent logs."}
+            </div>
+          ) : null}
+          {notice ? (
+            <div
+              className={`flex items-start justify-between gap-3 rounded-lg px-3 py-2 text-2xs ${
+                notice.ok
+                  ? "bg-black/[0.03] text-muted"
+                  : "bg-danger/10 text-danger"
+              }`}
+            >
+              <span className="leading-relaxed">{notice.text}</span>
+              <button
+                type="button"
+                className="shrink-0 opacity-70 hover:opacity-100"
+                onClick={clearControlNotice}
+              >
+                ✕
+              </button>
             </div>
           ) : null}
           <div ref={bottomRef} />
@@ -347,19 +471,27 @@ export function Chat(): JSX.Element {
       </div>
 
       <div className="mx-auto w-full max-w-3xl px-5 pb-5 pt-1">
-        {showEvolveChip ? (
+        {streaming ? (
           <div className="mb-2 flex justify-center">
             <button
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-canvas px-3 py-1 text-2xs text-muted transition-colors hover:border-border-strong hover:text-foreground"
-              onClick={openEvolve}
               type="button"
+              onClick={cancel}
+              disabled={cancelling}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-canvas px-3 py-1 text-2xs text-muted transition-colors hover:border-border-strong hover:text-text disabled:opacity-60"
+              title="POST /eve/v1/session/:id/cancel — confirmed on the stream as turn.cancelled"
             >
-              <IconWand className="h-3.5 w-3.5" />
-              Turn this into a change to the agent
+              <IconStop className="h-3 w-3" />
+              {cancelling ? "Cancelling…" : "Cancel turn"}
             </button>
           </div>
         ) : null}
         <div className="flex items-end gap-2.5 rounded-[18px] border border-border bg-panel px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)]">
+          <SessionMenu
+            disabled={!activeThreadId || !ready}
+            onCompact={() => void compactContext()}
+            onClear={() => void clearContext()}
+            onReset={() => void resetSession()}
+          />
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -380,19 +512,31 @@ export function Chat(): JSX.Element {
             disabled={!ready || !activeThreadId}
             className="field-auto max-h-44 flex-1 resize-none self-center border-0 bg-transparent text-[14px] leading-6 text-text outline-none placeholder:text-faint disabled:opacity-50"
           />
-          <button
-            type="button"
-            onClick={() => submit()}
-            disabled={!canSend}
-            title="Send"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-text text-white transition-[background-color,transform] duration-150 hover:bg-text/80 active:scale-95 disabled:bg-black/[0.05] disabled:text-faint"
-          >
-            {streaming ? (
-              <Spinner className="h-[18px] w-[18px]" />
-            ) : (
+          {streaming ? (
+            <button
+              type="button"
+              onClick={cancel}
+              disabled={cancelling}
+              title="Cancel turn"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-text text-white transition-[background-color,transform] duration-150 hover:bg-text/80 active:scale-95 disabled:bg-black/[0.05] disabled:text-faint"
+            >
+              {cancelling ? (
+                <Spinner className="h-[18px] w-[18px]" />
+              ) : (
+                <IconStop className="h-[14px] w-[14px]" />
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!canSend}
+              title="Send"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-text text-white transition-[background-color,transform] duration-150 hover:bg-text/80 active:scale-95 disabled:bg-black/[0.05] disabled:text-faint"
+            >
               <IconArrowUp className="h-[18px] w-[18px]" />
-            )}
-          </button>
+            </button>
+          )}
         </div>
         {model || projection.costUsd > 0 || projection.outputTokens > 0 ? (
           <div className="mt-2.5 flex items-center gap-3 px-1">
@@ -408,7 +552,7 @@ export function Chat(): JSX.Element {
               <div
                 className="h-full rounded-full bg-text/25 transition-[width] duration-500"
                 style={{
-                  width: `${Math.min(100, (projection.inputTokens / 200_000) * 100)}%`,
+                  width: `${Math.min(100, (projection.inputTokens / contextWindow) * 100)}%`,
                 }}
               />
             </div>
@@ -422,33 +566,6 @@ export function Chat(): JSX.Element {
           </div>
         ) : null}
       </div>
-
-      {evolveOpen ? (
-        <Modal onClose={closeEvolve} title="Evolve this" width="max-w-xl">
-          <div className="space-y-3 p-4">
-            <div className="flex items-start justify-between gap-3 rounded-lg bg-canvas px-3 py-2">
-              <span className="text-[13px] text-muted">“{evolveText}”</span>
-              <button
-                className="shrink-0 whitespace-nowrap text-2xs text-faint underline decoration-border-strong underline-offset-2 hover:text-foreground"
-                onClick={sendAsMessage}
-                type="button"
-              >
-                send as a message instead
-              </button>
-            </div>
-            {ev.phase === "drafting" ? (
-              <div className="flex items-center gap-2 text-[13px] text-muted">
-                <Spinner />
-                Drafting the change…
-              </div>
-            ) : null}
-            {ev.error ? (
-              <div className="text-xs text-danger">{ev.error}</div>
-            ) : null}
-            <ProposalReview doneLabel="Close" ev={ev} onDone={closeEvolve} />
-          </div>
-        </Modal>
-      ) : null}
     </div>
   );
 }

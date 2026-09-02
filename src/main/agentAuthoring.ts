@@ -30,6 +30,9 @@ function snake(s: string): string {
 }
 
 // ---------------- model / agent.ts ----------------
+/** eve 0.49's default root-agent model when `agent.ts` doesn't set one. */
+export const DEFAULT_MODEL = "openai/gpt-5.6-luna-fast";
+
 function agentTsPath(agentPath: string): string {
   return join(agentRoot(agentPath), "agent.ts");
 }
@@ -39,10 +42,10 @@ export function readModelConfig(agentPath: string): ModelConfig {
   const path = agentTsPath(agentPath);
   if (!existsSync(path)) {
     return {
-      model: "anthropic/claude-sonnet-5",
+      model: DEFAULT_MODEL,
       reasoning: null,
       editable: false,
-      note: "No agent.ts — Eve defaults the model to anthropic/claude-sonnet-5. Create agent.ts to set it.",
+      note: `No agent.ts — Eve defaults the model to ${DEFAULT_MODEL}. Create agent.ts (or run \`eve init\`) to set it.`,
     };
   }
   const src = readFileSync(path, "utf8");

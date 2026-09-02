@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CapabilityEditor } from "../components/CapabilityEditor";
 import { useActiveStructure } from "../lib/useStructure";
+import { OriginBadge } from "./Structure";
 import { IconChevronRight, IconPlus, IconRefresh, IconWand } from "../ui/icons";
 import {
   Badge,
@@ -180,9 +181,16 @@ export function Skills(): JSX.Element {
                   key={s.name}
                   icon={<IconWand className="h-4 w-4" />}
                   title={s.name}
-                  badge={<Badge>skill</Badge>}
+                  badge={
+                    <>
+                      <Badge>skill</Badge>
+                      <OriginBadge origin={s.origin} extension={s.extension} />
+                    </>
+                  }
                   desc={s.description || undefined}
-                  onClick={() => setEditing(s.name)}
+                  onClick={
+                    s.origin === "extension" ? undefined : () => setEditing(s.name)
+                  }
                   right={
                     <IconChevronRight className="mt-1.5 h-4 w-4 text-faint opacity-0 transition-opacity group-hover:opacity-100" />
                   }

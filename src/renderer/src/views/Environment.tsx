@@ -1,5 +1,6 @@
 import type { EnvState, VercelStatus } from "@shared/ipc";
 import { useCallback, useEffect, useState } from "react";
+import { NeedsLink } from "../components/NeedsLink";
 import { useStore } from "../store";
 import { Console } from "../ui/Console";
 import { IconRefresh } from "../ui/icons";
@@ -15,11 +16,38 @@ import {
   ViewHeader,
 } from "../ui/kit";
 
+const ENV_LINE = /^(\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*)(.*)$/;
+
+/**
+ * Mask every value in a dotenv document: `KEY="••••••"`. Prefixed keys such
+ * as `kb_…` / `sk_…` keep their first four characters so they stay
+ * recognizable; comments and blank lines pass through.
+ */
+function maskEnv(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => {
+      const m = ENV_LINE.exec(line);
+      if (!m || line.trimStart().startsWith("#")) {
+        return line;
+      }
+      const raw = m[2].trim().replace(/^["']|["']$/g, "");
+      if (!raw) {
+        return line;
+      }
+      const prefix = /^[a-z]{2,3}_/i.test(raw) ? raw.slice(0, 4) : "";
+      return `${m[1]}"${prefix}••••••"`;
+    })
+    .join("\n");
+}
+
 function EnvEditor({ agentId }: { agentId: string }): JSX.Element {
   const [env, setEnv] = useState<EnvState | null>(null);
   const [active, setActive] = useState(".env.local");
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
+  // Secrets stay hidden until asked for; editing needs them visible.
+  const [showValues, setShowValues] = useState(false);
 
   const load = useCallback(async () => {
     const e = await window.studio.agents.envRead(agentId);
@@ -80,6 +108,15 @@ function EnvEditor({ agentId }: { agentId: string }): JSX.Element {
           ))}
         </div>
         <div className="flex-1" />
+        <label className="flex items-center gap-1.5 text-2xs text-muted">
+          <input
+            type="checkbox"
+            checked={showValues}
+            onChange={(e) => setShowValues(e.target.checked)}
+            className="accent-accent"
+          />
+          Show values
+        </label>
         {dirty ? (
           <span className="font-spacemono text-[10px] uppercase tracking-[0.14em] text-warn">
             unsaved
@@ -90,17 +127,34 @@ function EnvEditor({ agentId }: { agentId: string }): JSX.Element {
             saved
           </span>
         ) : null}
-        <Button variant="primary" size="sm" onClick={save} disabled={!dirty}>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={save}
+          disabled={!dirty || !showValues}
+          title={showValues ? undefined : "Show values to edit"}
+        >
           Save
         </Button>
       </div>
-      <Textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        spellCheck={false}
-        placeholder={`KEY=value\nANOTHER_KEY=value`}
-        className="min-h-0 flex-1 resize-none rounded-none border-0 font-mono text-[12px] focus:border-0"
-      />
+      {showValues ? (
+        <Textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          spellCheck={false}
+          placeholder={`KEY=value\nANOTHER_KEY=value`}
+          className="min-h-0 flex-1 resize-none rounded-none border-0 font-mono text-[12px] focus:border-0"
+        />
+      ) : (
+        <pre
+          className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[12px] leading-relaxed text-muted"
+          title="Values are masked — tick “Show values” to reveal and edit"
+        >
+          {draft
+            ? maskEnv(draft)
+            : "(empty — tick “Show values” to add KEY=value lines)"}
+        </pre>
+      )}
     </Card>
   );
 }
@@ -229,9 +283,11 @@ function VercelPanel({ agentId }: { agentId: string }): JSX.Element {
           ) : null}
         </>
       ) : (
-        <div className="text-[13px] leading-relaxed text-muted">
-          This project isn't linked to Vercel. Link it from a terminal in the
-          project folder:{" "}
+        <div className="space-y-3 text-[13px] leading-relaxed text-muted">
+          <NeedsLink agentId={agentId} />
+          <div>
+          This project isn't linked to Vercel. Sign in and link above, or from
+          a terminal in the project folder:{" "}
           <code className="rounded bg-black/[0.05] px-1 font-mono text-xs">
             vercel link
           </code>{" "}
@@ -240,6 +296,7 @@ function VercelPanel({ agentId }: { agentId: string }): JSX.Element {
             eve link
           </code>
           , which also pulls AI Gateway creds). Then reload.
+          </div>
         </div>
       )}
     </Card>

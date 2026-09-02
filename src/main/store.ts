@@ -11,10 +11,16 @@ import { app } from "electron";
 import type {
   BuzzCredInput, AgentRecord, EveEvent, ThreadRecord } from "../shared/ipc";
 
-/** Resume state for an Eve session (Eve has no server-side history — we own it). */
+/**
+ * Resume state for an Eve session (Eve has no server-side history — we own it).
+ *
+ * @remarks
+ * Sessions are addressed by durable id only (eve 0.49). Records persisted by
+ * older Studio builds may still carry a `continuationToken` field; it is
+ * ignored on read and dropped on the next write.
+ */
 export interface SessionCursor {
   sessionId?: string;
-  continuationToken?: string;
   streamIndex: number;
 }
 

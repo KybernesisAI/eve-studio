@@ -1,7 +1,7 @@
 import type { ConnectorItem, ConnectorUsage } from "@shared/ipc";
 import { useCallback, useEffect, useState } from "react";
 import { Console } from "../ui/Console";
-import { IconExternal, IconRefresh } from "../ui/icons";
+import { IconChevronDown, IconExternal, IconRefresh } from "../ui/icons";
 import {
   Badge,
   Button,
@@ -11,6 +11,7 @@ import {
   Kicker,
   Modal,
   Spinner,
+  cx,
 } from "../ui/kit";
 
 const CHANNEL_TYPES = new Set(["slack", "github", "linear"]);
@@ -288,6 +289,58 @@ function Logo({ name, type }: { name: string; type: string }): JSX.Element {
   );
 }
 
+function ConnectorRow({
+  agentId,
+  c,
+  used,
+  attached,
+  onUse,
+}: {
+  agentId: string;
+  c: ConnectorItem;
+  used: ConnectorUsage[];
+  attached: boolean;
+  onUse: () => void;
+}): JSX.Element {
+  const asConnection = used.some((u) => u.kind === "connection");
+  const asChannel = used.some((u) => u.kind === "channel");
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border/70 px-3 py-3 transition-colors hover:border-border-strong hover:bg-black/[0.02]">
+      <Logo name={c.name} type={c.type} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="truncate text-[13px] font-medium text-text">
+            {c.name}
+          </span>
+          <Badge tone="accent">{c.type}</Badge>
+          {asConnection ? <Badge tone="success">✓ connection</Badge> : null}
+          {asChannel ? <Badge tone="success">✓ channel</Badge> : null}
+          {attached && !asConnection && !asChannel ? (
+            <Badge tone="info">attached to project</Badge>
+          ) : null}
+        </div>
+        <div className="mt-0.5 truncate font-mono text-2xs text-faint">
+          {c.uid}
+        </div>
+      </div>
+      <IconButton
+        onClick={() => window.studio.vercel.openConnectorPage(agentId, c.uid)}
+        title="Open in Vercel (authorize / manage)"
+      >
+        <IconExternal className="h-3.5 w-3.5" />
+      </IconButton>
+      <Button variant="secondary" size="sm" onClick={onUse}>
+        {used.length > 0 ? "Manage" : "Use in agent"}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Vercel Connect connectors, split into the ones this agent actually uses
+ * (referenced by its channel/connection files, or attached to its Vercel
+ * project) and the rest of the team's connectors, collapsed.
+ */
 export function ConnectorsGallery({
   agentId,
 }: {
@@ -295,9 +348,11 @@ export function ConnectorsGallery({
 }): JSX.Element {
   const [list, setList] = useState<ConnectorItem[] | null>(null);
   const [usage, setUsage] = useState<ConnectorUsage[]>([]);
+  const [attached, setAttached] = useState<Set<string>>(new Set());
   const [err, setErr] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const [use, setUse] = useState<ConnectorItem | null>(null);
+  const [othersOpen, setOthersOpen] = useState(false);
 
   const refreshUsage = useCallback(async () => {
     const uids = (list ?? []).map((c) => c.uid);
@@ -312,12 +367,17 @@ export function ConnectorsGallery({
       setErr(r.output ?? "Couldn't list connectors.");
     }
     setList(connectors);
-    setUsage(
-      await window.studio.agents.connectorUsage(
+    const [u, a] = await Promise.all([
+      window.studio.agents.connectorUsage(
         agentId,
         connectors.map((c) => c.uid),
       ),
-    );
+      window.studio.registry
+        .connectorsAttached(agentId)
+        .catch(() => ({ projectId: null, attached: [] as string[] })),
+    ]);
+    setUsage(u);
+    setAttached(new Set(a.attached));
   }, [agentId]);
 
   useEffect(() => {
@@ -338,14 +398,22 @@ export function ConnectorsGallery({
     }
   };
 
+  const usedBy = (uid: string): ConnectorUsage[] =>
+    usage.filter((u) => u.uid === uid);
+  const isMine = (c: ConnectorItem): boolean =>
+    usedBy(c.uid).length > 0 || attached.has(c.uid);
+  const mine = (list ?? []).filter(isMine);
+  const others = (list ?? []).filter((c) => !isMine(c));
+
   return (
     <div className="space-y-3">
       <div className="flex items-end justify-between gap-3">
         <div>
           <Kicker className="mb-1.5">Vercel Connect</Kicker>
           <div className="text-[13px] leading-relaxed text-muted">
-            The providers your agent can connect to (managed OAuth &amp; API
-            keys).
+            Managed OAuth &amp; API-key connectors. "Attached" = referenced by
+            this agent's channel/connection files or attached to its Vercel
+            project.
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -356,7 +424,7 @@ export function ConnectorsGallery({
             disabled={opening}
           >
             <IconExternal className="h-3.5 w-3.5" />
-            {opening ? "Opening…" : "Add connection"}
+            {opening ? "Opening…" : "Add connector"}
           </Button>
           <IconButton onClick={() => void load()} title="Refresh">
             <IconRefresh className="h-3.5 w-3.5" />
@@ -380,8 +448,8 @@ export function ConnectorsGallery({
       ) : list.length === 0 ? (
         <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
           <div className="max-w-sm text-[13px] leading-relaxed text-muted">
-            No connections yet. Browse the full provider catalog — Slack,
-            GitHub, Notion, Figma, Shopify, and hundreds more — and add one.
+            No connectors yet. Browse the full provider catalog — Slack, GitHub,
+            Notion, Figma, Shopify, and hundreds more — and add one.
           </div>
           <Button
             variant="primary"
@@ -390,51 +458,71 @@ export function ConnectorsGallery({
             disabled={opening}
           >
             <IconExternal className="h-3.5 w-3.5" />
-            Add connection
+            Add connector
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {list.map((c) => {
-            const used = usage.filter((u) => u.uid === c.uid);
-            const asConnection = used.some((u) => u.kind === "connection");
-            const asChannel = used.some((u) => u.kind === "channel");
-            return (
-              <div
-                key={c.uid}
-                className="flex items-center gap-3 rounded-lg border border-border/70 px-3 py-3 transition-colors hover:border-border-strong hover:bg-black/[0.02]"
-              >
-                <Logo name={c.name} type={c.type} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="truncate text-[13px] font-medium text-text">
-                      {c.name}
-                    </span>
-                    <Badge tone="accent">{c.type}</Badge>
-                    {asConnection ? (
-                      <Badge tone="success">✓ connection</Badge>
-                    ) : null}
-                    {asChannel ? <Badge tone="success">✓ channel</Badge> : null}
-                  </div>
-                  <div className="mt-0.5 truncate font-mono text-2xs text-faint">
-                    {c.uid}
-                  </div>
-                </div>
-                <IconButton
-                  onClick={() =>
-                    window.studio.vercel.openConnectorPage(agentId, c.uid)
-                  }
-                  title="Open in Vercel (authorize / manage)"
-                >
-                  <IconExternal className="h-3.5 w-3.5" />
-                </IconButton>
-                <Button variant="secondary" size="sm" onClick={() => setUse(c)}>
-                  {used.length > 0 ? "Manage" : "Use in agent"}
-                </Button>
+        <>
+          <div className="space-y-2">
+            <div className="font-spacemono text-[10px] uppercase tracking-[0.14em] text-faint">
+              Attached to this agent
+              <span className="ml-1.5 font-mono normal-case tracking-normal">
+                {mine.length}
+              </span>
+            </div>
+            {mine.length === 0 ? (
+              <div className="rounded-lg border border-border bg-subtle px-3 py-3 text-2xs leading-relaxed text-muted">
+                None yet — pick one of your team's connectors below and "Use in
+                agent", or add a new one.
               </div>
-            );
-          })}
-        </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {mine.map((c) => (
+                  <ConnectorRow
+                    key={c.uid}
+                    agentId={agentId}
+                    c={c}
+                    used={usedBy(c.uid)}
+                    attached={attached.has(c.uid)}
+                    onUse={() => setUse(c)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {others.length > 0 ? (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setOthersOpen((v) => !v)}
+                className="flex w-full items-center gap-1.5 text-left font-spacemono text-[10px] uppercase tracking-[0.14em] text-faint transition-colors hover:text-text"
+              >
+                <IconChevronDown
+                  className={cx(
+                    "h-3.5 w-3.5 transition-transform",
+                    !othersOpen && "-rotate-90",
+                  )}
+                />
+                Other connectors on your team ({others.length})
+              </button>
+              {othersOpen ? (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {others.map((c) => (
+                    <ConnectorRow
+                      key={c.uid}
+                      agentId={agentId}
+                      c={c}
+                      used={[]}
+                      attached={false}
+                      onUse={() => setUse(c)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </>
       )}
 
       {use ? (
@@ -444,6 +532,7 @@ export function ConnectorsGallery({
           onClose={() => {
             setUse(null);
             void refreshUsage();
+            void load();
           }}
         />
       ) : null}

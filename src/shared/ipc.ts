@@ -53,12 +53,17 @@ export interface ThreadRecord {
 
 /**
  * An Eve session stream event. Permissive by design — the UI switches on `type`.
- * Shapes are documented in Eve's protocol/message module.
+ * Shapes are documented in Eve's protocol/message module (`MessageStreamEvent`).
+ *
+ * @remarks
+ * `meta.id` is the durable ULID eve stamps on every persisted event (stream
+ * version 20+). It is stable across reconnects and rewinds, so it is the key
+ * used to drop duplicates when a stream is resumed from a lagging cursor.
  */
 export interface EveEvent {
   type: string;
   data?: Record<string, unknown>;
-  meta?: { at?: string };
+  meta?: { at?: string; id?: string };
   sequence?: number;
   turnId?: string;
   stepIndex?: number;
@@ -85,34 +90,76 @@ export interface AddAgentResult {
   error?: string;
 }
 
-// --- structure (read from the compiled manifest) ---
+// --- structure (read from the compiled manifest, v47 / eve 0.49) ---
+/**
+ * Who contributed a capability: the application itself, an extension mounted
+ * under `agent/extensions/<ns>.ts` (contributions are prefixed `<ns>__`), or
+ * eve's own framework defaults (`sourceId` starting `eve:defaults:` /
+ * `eve:root-defaults:`).
+ */
+export type StructureOrigin = "application" | "extension" | "framework";
 export interface StructureTool {
   name: string;
   description?: string;
+  /** Tool declares an approval gate (`approval: always()/once()`). */
+  requiresApproval?: boolean;
+  /**
+   * Source is a leftover from Eve Studio's retired Evolve feature (the
+   * `propose_change` tool it used to write). Safe to delete.
+   */
+  legacyStudio?: boolean;
+  origin?: StructureOrigin;
+  /** Extension namespace when `origin === "extension"`. */
+  extension?: string;
 }
 export interface StructureConnection {
   name: string;
   protocol?: string;
   url?: string;
   description?: string;
+  origin?: StructureOrigin;
+  extension?: string;
 }
 export interface StructureNamed {
   name: string;
   description?: string;
+  origin?: StructureOrigin;
+  extension?: string;
 }
 export interface StructureChannel {
   name: string;
   method?: string;
   urlPath?: string;
   kind?: string;
+  origin?: StructureOrigin;
 }
 export interface StructureSchedule {
   name: string;
   cron?: string;
+  /** Fire-and-forget prompt (markdown form); absent for `run()` handlers. */
+  markdown?: string;
+  hasRun?: boolean;
+}
+export interface StructureHook {
+  name: string;
+  eventNames?: string[];
 }
 export interface StructureRemote {
   name: string;
   url?: string;
+}
+/** A memory slot authored at `agent/memory/<slot>.ts` (`defineMemory`). */
+export interface StructureMemory {
+  slot: string;
+  description?: string;
+  visibility?: string;
+  logicalPath: string;
+}
+/** An extension mounted at `agent/extensions/<ns>.ts`. */
+export interface StructureExtension {
+  namespace: string;
+  packageName: string;
+  mountLogicalPath: string;
 }
 export interface AgentStructure {
   source: "compiled" | "cli" | "none";
@@ -125,7 +172,13 @@ export interface AgentStructure {
   schedules: StructureSchedule[];
   subagents: StructureNamed[];
   remoteAgents: StructureRemote[];
-  hooks: string[];
+  hooks: StructureHook[];
+  memories: StructureMemory[];
+  extensions: StructureExtension[];
+  /**
+   * `"default"` when the agent runs on eve's framework sandbox, else the
+   * authored sandbox's logical path (e.g. `sandbox.ts`); `null` when unknown.
+   */
   sandbox: string | null;
   diagnostics: { errors: number; warnings: number };
   error?: string;
@@ -175,26 +228,80 @@ export interface ArcanaResult<T> {
   data?: T;
   error?: string;
 }
-/** What Studio can infer about an agent's Arcana wiring from its files. */
+/**
+ * What Studio can infer about an agent's Arcana wiring (eve 0.49).
+ *
+ * @remarks
+ * `extension` = the official `extension/arcana` mount (`agent/extensions/arcana.ts`,
+ * `@kybernesis/arcana`); `legacy` = a hand-written `connections/arcana.ts` from
+ * older Studio builds; `none` = nothing wired. The key itself never crosses IPC.
+ */
 export interface DetectedBrain {
-  connections: { name: string; url?: string }[];
+  mode: "extension" | "legacy" | "none";
   workspace?: string;
-  envVar?: string;
-  keyPresent?: boolean;
-  saved?: BrainInfo | null;
+  /** Env var holding the `kb_` key (`ARCANA_API_KEY` for the extension). */
+  keyEnvVar: string;
+  /** Every key-shaped env var the mount reads (e.g. eval + prod keys). */
+  keyEnvVars?: string[];
+  /** Env var holding the workspace slug (`ARCANA_WORKSPACE`); unset for legacy. */
+  workspaceEnvVar?: string;
+  /** Where `workspace` came from: the env var, or the mount's literal default. */
+  workspaceSource?: "env" | "default";
+  /** The literal after `??` in the mount, when present. */
+  workspaceDefault?: string;
+  hasKey: boolean;
+  /** `agent/extensions/arcana.ts` when mounted. */
+  mountFile?: string;
+  /** `agent/connections/arcana.ts` when a legacy connection exists. */
+  legacyFile?: string;
+  hasLegacyFile: boolean;
+  /** `@kybernesis/arcana` is present in node_modules. */
+  packageInstalled: boolean;
+  /** The compiled manifest agrees with what's on disk (false ⇒ restart/`eve info` pending). */
+  inManifest: boolean;
+  /** Subagent ids with their own `extensions/arcana.ts` mount. */
+  subagentMounts: string[];
 }
 export interface WireBrainInput {
   workspace: string;
-  envVar: string;
   key: string;
-  description?: string;
+  /** Skip the read-only key check (used when re-wiring a validated credential). */
+  skipValidate?: boolean;
 }
 export interface WireBrainResult {
   ok: boolean;
-  files?: string[];
-  /** True when the key was also pushed to the linked Vercel project's env. */
+  /** Repo-relative files written or changed. */
+  files: string[];
+  /** `eve add extension/arcana` failed on the peer range; Studio installed + mounted directly. */
+  usedFallback: boolean;
+  packageManager?: "pnpm" | "yarn" | "npm";
+  /** Both env vars were pushed to the linked Vercel project (all targets). */
   pushedToVercel?: boolean;
+  /** Transcript of `eve add` / the fallback install, for the console. */
+  addOutput?: string;
+  envVars?: string[];
+  warnings?: string[];
   error?: string;
+}
+/** Result of `eve info --json` as Studio reads it. */
+export interface EveInfoResult {
+  ok: boolean;
+  status?: string;
+  layout?: string;
+  errors: number;
+  warnings: number;
+  skills?: string[];
+  subagents?: string[];
+  error?: string;
+}
+export interface MigrateBrainResult {
+  ok: boolean;
+  removedLegacy: boolean;
+  wire?: WireBrainResult;
+  info?: EveInfoResult;
+  error?: string;
+  /** Set when the migration succeeded but the post-check could not run. */
+  warning?: string;
 }
 
 export interface InstructionsFile {
@@ -226,6 +333,33 @@ export interface CreateAgentInput {
   parentDir: string;
   name: string;
   webChat?: boolean;
+  /** AI Gateway model id passed to `eve init --model` (default: eve's own). */
+  model?: string;
+}
+
+/** Outcome of upgrading an agent's eve package to `eve@latest`. */
+export interface EveUpgradeResult {
+  ok: boolean;
+  /** Installed eve version after the run (from node_modules), when readable. */
+  version: string | null;
+  /** `eve info --json` diagnostics after the upgrade, when it ran. */
+  diagnostics?: { errors: number; warnings: number };
+  /** Package manager used (pnpm / yarn / npm). */
+  packageManager?: string;
+  /** True when @kybernesis/arcana was bumped in the same install. */
+  bumpedArcana?: boolean;
+  error?: string;
+}
+
+/** Outcome of `eve add <item> --non-interactive --yes` (registry install). */
+export interface RegistryAddResult {
+  ok: boolean;
+  /** Exit 2: setup needs an answer or an unmet prerequisite. */
+  needsInput?: boolean;
+  /** The continuation command eve printed on the final event, if any. */
+  nextCommand?: string;
+  /** Raw NDJSON/plain output for the console. */
+  output: string;
 }
 export interface CreateAgentResult {
   ok: boolean;
@@ -647,95 +781,12 @@ export interface ConnectorUsage {
   name: string;
 }
 
-// --- evolve (self-improving loop) ---
-/**
- * What kind of self-change a natural-language request maps to.
- *
- * @remarks
- * `memory` is a durable fact about the user (belongs in the agent's brain, no
- * rebuild); the others are file changes to the agent's source that require a
- * rebuild (local) or redeploy (production).
- */
-export type ProposalKind =
-  "memory" | "instructions" | "skill" | "tool" | "schedule";
-/** One file the proposal would create or overwrite. `before === null` = new file. */
-export interface ProposalFileChange {
-  relPath: string;
-  language: "ts" | "md" | "text";
-  before: string | null;
-  after: string;
-}
-/** A reviewed, human-approvable change the agent proposes to make to itself. */
-export interface EvolveProposal {
-  kind: ProposalKind;
-  /** Short label, e.g. "Add skill: morning-brief". */
-  title: string;
-  /** Why this kind, and what the change does. */
-  rationale: string;
-  /** File writes to apply (empty for `memory`). */
-  files: ProposalFileChange[];
-  /** For `kind: "memory"`: the fact to remember. */
-  memory?: string;
-  /** Blocking setup the change depends on, e.g. "Slack channel not connected". */
-  prereqs: string[];
-  /** File kinds need a rebuild/redeploy to take effect; memory does not. */
-  needsRebuild: boolean;
-}
-export interface EvolveDraftResult {
-  ok: boolean;
-  proposal?: EvolveProposal;
-  error?: string;
-}
-export interface EvolveApplyResult {
-  ok: boolean;
-  /** Repo-relative paths written. */
-  written: string[];
-  /** Whether the change was captured as a git commit (revert point). */
-  committed: boolean;
-  needsRebuild: boolean;
-  /** Present when `kind: "memory"` couldn't be persisted (no brain-write yet). */
-  note?: string;
-  error?: string;
-}
-/** An emergent suggestion: a recurring task worth turning into a capability. */
-export interface EvolveSuggestion {
-  /** Short label, e.g. "Draft weekly investor update". */
-  title: string;
-  /** Why Studio thinks this recurs and is worth automating. */
-  rationale: string;
-  /** The capability kind this should become. */
-  kind: "skill" | "tool" | "schedule";
-  /** A ready-to-draft intent phrase — feeds straight into the draft flow. */
-  intent: string;
-}
-export interface EvolveDetectResult {
-  ok: boolean;
-  suggestions: EvolveSuggestion[];
-  error?: string;
-}
-/** Name of the opt-in tool the agent calls to propose a change to itself. */
-export const PROPOSE_TOOL_NAME = "propose_change";
-/** A proposal the agent queued from outside Studio (e.g. a Slack DM). */
-export interface QueuedProposal {
-  id: string;
-  kind: ProposalKind;
-  title: string;
-  intent: string;
-  /** ISO timestamp the agent proposed it. */
-  ts: string;
-  /** The brain note backing this proposal (used to mark it resolved). */
-  note: string;
-}
-export interface QueuedProposalsResult {
-  ok: boolean;
-  proposals: QueuedProposal[];
-  error?: string;
-}
-
 export const IPC = {
   appInfo: "app:info",
 
   agentsList: "agents:list",
+  eveLatest: "eve:latest",
+  eveUpgrade: "eve:upgrade",
   agentsAdd: "agents:add",
   agentsRemove: "agents:remove",
 
@@ -821,15 +872,6 @@ export const IPC = {
   teamsSave: "teams:save",
   teamsStatus: "teams:status",
   vercelProdAlias: "vercel:prodAlias",
-  evolveDraft: "evolve:draft",
-  evolveApply: "evolve:apply",
-  evolveDetect: "evolve:detect",
-  evolveGetProposeTool: "evolve:getProposeTool",
-  evolveSetProposeTool: "evolve:setProposeTool",
-  evolveQueueStatus: "evolve:queueStatus",
-  evolveCreateQueueStore: "evolve:createQueueStore",
-  evolveListProposals: "evolve:listProposals",
-  evolveResolveProposal: "evolve:resolveProposal",
   deployGet: "agent:deployGet",
   deploySet: "agent:deploySet",
   deployHealth: "agent:deployHealth",
@@ -852,13 +894,28 @@ export const IPC = {
   agentLog: "agent:log",
 
   arcanaDetect: "arcana:detect",
-  arcanaSaveBrain: "arcana:saveBrain",
-  arcanaForgetBrain: "arcana:forgetBrain",
   arcanaValidate: "arcana:validate",
   arcanaStats: "arcana:stats",
   arcanaTimeline: "arcana:timeline",
   arcanaQuery: "arcana:query",
   arcanaWire: "arcana:wire",
+  arcanaMigrate: "arcana:migrate",
+
+  // ---- Registry & memory (eve 0.49) ----
+  registryList: "registry:list",
+  registryAdd: "registry:add",
+  registryView: "registry:view",
+  /** push: streamed `eve add` output lines ({ runId, data }) */
+  registryAddChunk: "registry:addChunk",
+  memorySlots: "memory:slots",
+  memoryAddFile: "memory:addFile",
+  memoryAddSupermemory: "memory:addSupermemory",
+  selfModStatus: "selfmod:status",
+  selfModEnable: "selfmod:enable",
+  /** Vercel Connect connectors attached to this agent's linked project. */
+  connectorsAttached: "connectors:attached",
+  extensionMountRead: "extension:mountRead",
+  extensionMountWrite: "extension:mountWrite",
 
   chatListThreads: "chat:listThreads",
   chatCreateThread: "chat:createThread",
@@ -867,6 +924,10 @@ export const IPC = {
   chatArchiveThread: "chat:archiveThread",
   chatSend: "chat:send",
   chatRespond: "chat:respond",
+  chatCancel: "chat:cancel",
+  chatClear: "chat:clear",
+  chatCompact: "chat:compact",
+  chatReset: "chat:reset",
 
   // auto-update (electron-updater)
   updaterGetState: "updater:getState",
@@ -880,3 +941,79 @@ export const IPC = {
   agentStatusChanged: "agent:statusChanged",
   updaterState: "updater:state",
 } as const;
+
+// ---- Registry & memory (eve 0.49) ----
+/** One item from `eve registry list --json` (official registry, 91 items). */
+export interface RegistryItem {
+  /** e.g. `channel/slack`, `extension/arcana`, `memory/supermemory`. */
+  name: string;
+  title: string;
+  /** Always `registry:item` today. */
+  type: string;
+  description: string;
+  registry: string;
+  addCommandArgument: string;
+  /** Site-relative docs path, e.g. `/docs/channels/slack` → `https://eve.dev${docs}`. */
+  docs?: string;
+  /** `native` | `chat-sdk` when the registry says how it's implemented. */
+  implementation?: string;
+}
+export interface RegistryListResult {
+  ok: boolean;
+  items: RegistryItem[];
+  cachedAt?: number;
+  error?: string;
+}
+/** Exit 0 → done, 1 → failed, 2 → needs an answer / prerequisite. */
+export type RegistryInstallStatus = "done" | "failed" | "needs-input";
+/** Structured outcome of `eve add <item> --non-interactive --yes`. */
+export interface RegistryInstallResult {
+  exitCode: number | null;
+  status: RegistryInstallStatus;
+  /** Final event `message` (or `prerequisite.message` when blocked). */
+  message?: string;
+  /** `next.command next.args…` from the final event — run it in a terminal. */
+  nextCommand?: string;
+  /** `prerequisite.command` when blocked (e.g. `eve link`). */
+  prerequisiteCommand?: string;
+  /** Env vars the item added to `.env.local` (scraped from the transcript). */
+  envVars?: string[];
+  /** Files the item created (scraped from the transcript). */
+  files?: string[];
+  /** e.g. `dependency_install` (peer-range failure, rolled back). */
+  failureCode?: string;
+  deploymentRequired?: boolean;
+}
+export interface RegistryInstallOptions {
+  skipSetup?: boolean;
+  overwrite?: boolean;
+}
+/** Streamed `eve add` output for the renderer console. */
+export interface RegistryAddChunk {
+  runId: string;
+  data: string;
+}
+export interface MemorySlot {
+  slot: string;
+  description?: string;
+  visibility?: string;
+  /** `memory/<slot>.ts` or `memory.ts`. */
+  logicalPath: string;
+  relPath: string;
+  /** Inferred from the slot's source; `unknown` when only the manifest knows it. */
+  provider: "file" | "supermemory" | "custom" | "unknown";
+  fromManifest: boolean;
+}
+export interface MemorySlotsResult {
+  slots: MemorySlot[];
+  source: "manifest" | "disk";
+}
+export interface SelfModStatus {
+  enabled: boolean;
+  relPath: string;
+}
+export interface ConnectorsAttached {
+  projectId: string | null;
+  /** Connector UIDs attached to the linked project (empty when unlinked). */
+  attached: string[];
+}

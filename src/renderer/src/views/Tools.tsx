@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CapabilityEditor } from "../components/CapabilityEditor";
 import { useActiveStructure } from "../lib/useStructure";
+import { OriginBadge } from "./Structure";
 import {
   IconChevronRight,
   IconPlus,
@@ -187,7 +188,8 @@ export function Tools(): JSX.Element {
             }
           >
             Tools are typed actions the agent can call. They run in the app
-            runtime with full env access.
+            runtime with full env access. Built-in tools (bash, read_file,
+            web_search, …) are listed once the manifest is read.
           </EmptyState>
         ) : (
           <div className="mx-auto max-w-2xl px-4 py-4">
@@ -197,9 +199,28 @@ export function Tools(): JSX.Element {
                   key={t.name}
                   icon={<IconWrench className="h-4 w-4" />}
                   title={t.name}
-                  badge={<Badge>tool</Badge>}
-                  desc={t.description || undefined}
-                  onClick={() => setEditing(t.name)}
+                  badge={
+                    <>
+                      <Badge>tool</Badge>
+                      {t.requiresApproval ? (
+                        <Badge tone="warn">approval</Badge>
+                      ) : null}
+                      {t.legacyStudio ? (
+                        <Badge tone="warn">legacy Eve Studio (Evolve) tool</Badge>
+                      ) : null}
+                      <OriginBadge origin={t.origin} extension={t.extension} />
+                    </>
+                  }
+                  desc={
+                    t.legacyStudio
+                      ? `${t.description ? `${t.description} — ` : ""}Evolve was retired; this tool is safe to delete.`
+                      : t.description || undefined
+                  }
+                  onClick={
+                    t.origin === "application" || !t.origin
+                      ? () => setEditing(t.name)
+                      : undefined
+                  }
                   right={
                     <IconChevronRight className="mt-1.5 h-4 w-4 text-faint opacity-0 transition-opacity group-hover:opacity-100" />
                   }

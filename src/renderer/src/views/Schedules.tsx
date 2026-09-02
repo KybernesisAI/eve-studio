@@ -115,7 +115,19 @@ function NewScheduleModal({
   );
 }
 
-/** Turn a 5-field cron into a rough human phrase (best-effort). */
+/** `HH:MM` UTC → the same instant in the user's local zone, as `HH:MM`. */
+function utcToLocal(hr: number, min: number): string {
+  const now = new Date();
+  const d = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hr, min),
+  );
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * Turn a 5-field cron into a rough human phrase (best-effort). Crons run in
+ * UTC on Vercel, so a fixed time is shown in UTC with the local equivalent.
+ */
 function describeCron(cron?: string): string | null {
   if (!cron) {
     return null;
@@ -125,10 +137,10 @@ function describeCron(cron?: string): string | null {
     return null;
   }
   const [min, hr, dom, , dow] = parts;
-  const at =
-    /^\d+$/.test(hr) && /^\d+$/.test(min)
-      ? `${hr.padStart(2, "0")}:${min.padStart(2, "0")}`
-      : null;
+  const fixed = /^\d+$/.test(hr) && /^\d+$/.test(min);
+  const at = fixed
+    ? `${hr.padStart(2, "0")}:${min.padStart(2, "0")} UTC · ${utcToLocal(Number(hr), Number(min))} local`
+    : null;
   const days = [
     "Sunday",
     "Monday",
@@ -139,12 +151,12 @@ function describeCron(cron?: string): string | null {
     "Saturday",
   ];
   if (dow !== "*" && /^\d$/.test(dow)) {
-    return `Weekly on ${days[Number(dow)]}${at ? ` at ${at}` : ""}`;
+    return `Weekly on ${days[Number(dow)]}${at ? ` at ${at}` : " (UTC)"}`;
   }
   if (dom === "*" && at) {
     return `Daily at ${at}`;
   }
-  return null;
+  return `${cron.trim()} (UTC)`;
 }
 
 export function Schedules(): JSX.Element {
@@ -246,7 +258,9 @@ export function Schedules(): JSX.Element {
               </Button>
             }
           >
-            Scheduled jobs wake the agent on a cron (root agent only).
+            Scheduled jobs wake the agent on a cron (root agent only). A
+            markdown schedule is a fire-and-forget prompt; a run() handler can
+            deliver to a channel with to(channel, target).send().
           </EmptyState>
         ) : (
           <div className="mx-auto max-w-2xl px-4 py-4">
@@ -258,7 +272,11 @@ export function Schedules(): JSX.Element {
                     key={s.name}
                     icon={<IconCalendar className="h-4 w-4" />}
                     title={s.name}
-                    desc={human || undefined}
+                    badge={s.hasRun ? <Badge tone="info">run()</Badge> : null}
+                    desc={
+                      [human, s.markdown].filter(Boolean).join(" — ") ||
+                      undefined
+                    }
                     onClick={() => setEditing(s.name)}
                     right={
                       <div className="flex items-center gap-2">

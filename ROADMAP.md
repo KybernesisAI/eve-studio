@@ -1,52 +1,36 @@
-# Eve Studio — Roadmap & Architecture
+# Eve Studio — Roadmap
 
-A native desktop control center for **every Eve agent you own** — run them, chat with them, inspect
-and edit their structure, give them **Arcana memory**, wire connections/channels, deploy, and keep
-them in parity with Eve releases. Think "Claude Desktop / Hermes / OpenClaw" but for Eve, and
-better. Shippable product; Electron + React + TypeScript + Tailwind + shadcn/ui.
+Eve Studio is an independent open-source desktop control center for [Eve](https://eve.dev) agents, built by Kybernesis. It is not an official Vercel product. Current line: `v0.3.x`, macOS-first, built for **eve 0.49+**.
 
-Grounded in first-source research of Eve 0.23.0 (session protocol, CLI surface, authoring contract +
-manifests, and the Arcana/Vercel wiring proven in the live `eve-gtm` agent).
+## Shipped
 
-## Core architecture
+- **Chat** against the local dev server or the deployed agent, streaming turns, tool calls, subagent delegations, reasoning, approvals, compaction events, cancellations, and failures. Session controls: Cancel turn, Compact context, Clear context, Reset session. Studio owns transcript persistence and thread archiving.
+- **Instructions & Model** — markdown editor over `instructions.md`; model and reasoning written with `eve set`; live AI Gateway model catalog.
+- **Capabilities** — create, open, edit, delete tools, skills, subagents, and hooks; extension-contributed capabilities badged; **Enable self-modification** (Eve's experimental, development-only subagent) under Subagents.
+- **Integrations** — **Add from registry** (browse/search the official eve registry and install with `eve add`), guided wizards for Slack, Discord, Telegram, Teams, Twilio, GitHub, Linear, and Buzz, Web Chat via `eve add channel/web`, connections (MCP / OpenAPI), and Vercel Connect connectors.
+- **Memory** — Eve session memory, memory slots (file memory scaffold, Supermemory via `eve add memory/supermemory`), and **Kybernesis Arcana** as an official eve extension (`eve add extension/arcana`), with key validation, local and Vercel env wiring, legacy-connection migration, and a brain browser (stats, timeline, search).
+- **Schedules** — list and create cron jobs.
+- **Deploy** — `eve deploy --non-interactive --yes`, env pull/push, secrets, logs, sandbox view.
+- **Evals** — list and run the agent's evals.
+- **Structure** refreshed with `eve info --json`; header chips for the installed eve version, a newer release on npm, build errors, Vercel link state, and the local server.
+- **Keep eve current** — in-app eve upgrade per agent with its own package manager (npm retried with `--legacy-peer-deps`), bumping `@kybernesis/arcana` alongside, then `eve info --json` with diagnostics.
+- **Integrations layout** — this agent's connections (extension rows badged), Vercel Connect split into attached and other team connectors, registry gallery, and a "More channels from the eve registry" list.
+- **Onboarding** — Node 24 provisioned by the app; Eve installed with `npx eve@latest`; Vercel sign-in and link in-app.
+- Signed, notarized macOS builds with an in-app updater.
 
-Electron with `contextIsolation` + a locked-down preload IPC bridge. Renderer is React/TS/Tailwind/
-shadcn (Zustand for state). Heavy lifting lives in **main-process services**:
+## Next
 
-| Service | Responsibility |
-|---|---|
-| **AgentRegistry** | Known agents `{id, name, path, eveVersion, status}`; add-existing (pick a folder) or created-new. Persisted. |
-| **AgentProcessManager** | Spawns & supervises one `eve dev --no-ui --port <free>` per running agent; health-gates on `GET /eve/v1/health`; assigns ports; restarts; stops all on quit. Loopback ⇒ no auth needed. |
-| **ManifestReader** | Parses `.eve/compile/compiled-agent-manifest.json` (resolved tool JSON-schemas, connections, skills, channels+routes, schedules+cron, subagent graph, model) and `.eve/discovery/*` (raw markdown + diagnostics). Refreshes via `eve build` / `eve info --json`. |
-| **CliRunner** | Structured spawns of `eve` / `vercel` / `pnpm` — `info --json`, `eval --json`, `deploy` (parse `Deployed: <url>` + exit code), `channels add web -y`, `build`. Knows scriptable-vs-hand-off. |
-| **ChatService (+ SQLite)** | Eve has **no history API** — Studio owns persistence: per-thread `{SessionState cursor, ordered event log}`. Drives sessions with first-party `eve/client`; forwards the event stream to the renderer over IPC. |
-| **ArcanaService** | Validate `kb_` keys read-only against `api.arcana.kybernesis.ai`; list/create workspaces; write the static-key MCP connection + env; browse/query a brain (timeline/entities/facts). |
-| **VercelService** | Link (hand-off), deploy, env, runtime logs; channel connectors. |
-| **UpdateService** | Per-agent installed-eve vs npm-latest; changelog; guided upgrade (`pnpm add eve@latest` → detect known breaking changes → migrate → gate on typecheck + `eve info`). |
-| **SecretsVault** | OS keychain for `kb_` keys / tokens; never plaintext. |
+- **Registry setup-answer prompts** — a UI for the answers `eve add` asks for (exit code `2` / `next.command`) instead of surfacing the continuation command.
+- **Per-subagent Arcana mounts** — wire a separate brain to a subagent (`agent/subagents/<id>/extensions/arcana.ts`) from the Memory tab.
+- **Memory-slot editor** — edit a slot's provider, scope, namespace, and visibility in a form.
+- **Traces viewer** — read local traces through `eve traces` and show the span tree per session.
+- **Evals authoring** — scaffold `evals/*.eval.ts` and show per-assertion results from the run artifacts.
+- **`eve link` in-app** — replace the `vercel link` + `vercel env pull` pair with `eve link --non-interactive`.
+- **Self-modification chat UX** — surface the self-modification subagent's file changes and registry installs as reviewable diffs in Chat.
+- **Windows and Linux** builds.
 
-### Decisions locked by research
-- **Reuse Eve's client, don't hand-roll HTTP.** Chat = spawn `eve dev --no-ui --port N` + `eve/client` `Client`/`ClientSession` (or `eve/react` `useEveAgent` in the renderer). One process/port per running agent = true isolation. Loopback needs no credentials.
-- **Studio owns chat history** (SQLite) — Eve exposes only a resume cursor, no session/turn list. This is what makes it feel like Claude Desktop.
-- **Structure = read the compiled manifest, write files.** There is **no `eve model` command** and no mutation API — every edit (model, tools, connections, skills, schedules, subagents) is a **file write** against the documented templates, then re-run `eve info`/`build` to re-derive `.eve/` and surface diagnostics (0/0 gate).
-- **Rich chat rendering** from the event union: `message.appended` deltas, tool calls correlated by `callId` (`actions.requested`+`action.result`), nested subagents (inline `subagent.event` wrappers or child `childSessionId` streams), HITL `input.requested`, OAuth `authorization.required`, token/cost from `step.completed.usage`.
-- **Arcana the eve-gtm way**: a static `kb_` key MCP connection (`url: mcp.arcana.kybernesis.ai/mcp`, `getToken` from env, `X-Kyberagent-Agent: <workspace>` header) — app-scoped so it even works in scheduled turns. Keys validated read-only; per-subagent separate brains supported.
-- **Parity**: `pnpm add eve@latest` + a migration catalog (e.g. `vercelSandboxBackend()`→`vercel()`, tool `needsApproval`→`approval`) + typecheck/`eve info` gates.
+## Known issues
 
-## Phases (milestones — reviewed as we go)
-
-- **P0 — Foundation.** Repo, electron-vite, app shell, IPC bridge, design system, AgentRegistry, AgentProcessManager (spawn/health/stop), settings + secrets vault.
-- **P1 — Library + live Chat.** Add existing agents; boot them; **stream chat with `eve-gtm`** rendering tool calls, subagents, approvals, cost; SQLite thread history + resume. *(First daily-usable build.)*
-- **P2 — Structure Explorer.** Read the compiled manifest → render model, tools (+JSON-schema forms), connections, skills, channels+routes, schedules+cron, subagent graph, hooks, sandbox. Diagnostics panel.
-- **P3 — Arcana Memory ⭐.** Wire a brain to any agent (workspace picker + key validate + connection/env write); per-subagent brains; **brain browser** (timeline, entities, facts, live query).
-- **P4 — Structure editing.** Create/edit tools, connections, skills, schedules, subagents, hooks; change model; every edit is a templated file write + gate.
-- **P5 — New-Agent wizard.** `eve init <name>` + guided model/channels/connections/Arcana in one flow.
-- **P6 — Connections & Channels.** MCP/OpenAPI connections; Slack/Discord/Telegram via the Vercel Connect flow (automate what we can, hand off the browser steps).
-- **P7 — Deploy & Logs.** Deploy when linked; link hand-off; production URL/status; Vercel runtime logs/errors.
-- **P8 — Eval runner.** `eve eval --list/--json`; run + results UI; per-agent regression status.
-- **P9 — Update / Parity center.** Version badges, changelog, guided upgrade + migration + verification.
-- **P10 — Ship.** electron-builder packaging + notarization + auto-update; onboarding; command palette; multi-agent dashboard.
-
-## Stack
-Electron · electron-vite · React · TypeScript · Tailwind · shadcn/ui · Zustand · better-sqlite3 ·
-`eve` (client) · electron-builder (+ notarization/auto-update). Separate repo from the agents.
+- `eve add extension/arcana` can fail with `{"type":"failed","failureCode":"dependency_install"}` on npm-managed projects whenever the published `@kybernesis/arcana` peer range does not cover the agent's eve version (0.3.0 was pinned to eve 0.38; 0.4.0 is pinned to 0.49, so the next eve minor will hit it again). Studio falls back to installing the package with the project's package manager (`npm install --legacy-peer-deps`, `pnpm add`, or `yarn add`) and writes `agent/extensions/arcana.ts` itself. The permanent fix is a wildcard `eve` peer range in the package, as Eve's extension docs recommend.
+- Slack and Buzz reach the **deployed** agent only. Local dev is never reachable from those platforms; deploy to test them.
+- macOS only. The Buzz background bridge is a macOS LaunchAgent.

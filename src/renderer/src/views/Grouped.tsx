@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useActiveStructure } from "../lib/useStructure";
+import { useStore } from "../store";
 import { SubNav } from "../ui/kit";
 import { Channels } from "./Channels";
 import { Connections } from "./Connections";
@@ -99,7 +100,12 @@ export function IntegrationsGroup(): JSX.Element {
 
 /** Deploy & Logs + Environment + Sandbox. */
 export function DeployGroup(): JSX.Element {
-  const [sub, setSub] = useState("deploy");
+  // The header's "Link & deploy" jumps straight to the Environment sub-tab.
+  const deploySub = useStore((s) => s.deploySub);
+  const [sub, setSub] = useState<string>(deploySub);
+  useEffect(() => {
+    setSub(deploySub);
+  }, [deploySub]);
   return (
     <div className="flex h-full flex-col">
       <SubNav

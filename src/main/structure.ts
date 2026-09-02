@@ -1,14 +1,21 @@
-import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentStructure } from "../shared/ipc";
+import type {
+  AgentStructure,
+  StructureHook,
+  StructureOrigin,
+} from "../shared/ipc";
 import { readModelConfig } from "./agentAuthoring";
-import { eveBin } from "./cli";
+import { eveInfoJson } from "./cli";
 
 function agentRootOf(agentPath: string): string {
   return existsSync(join(agentPath, "agent"))
     ? join(agentPath, "agent")
     : agentPath;
+}
+
+function manifestPath(agentPath: string): string {
+  return join(agentPath, ".eve", "compile", "compiled-agent-manifest.json");
 }
 
 /** Names in a capability dir — `.ts` files (stripped) or subdirectories. */
@@ -27,41 +34,44 @@ function listDir(dir: string, mode: "ts" | "dirs"): string[] {
 }
 
 /**
- * Merge capabilities authored on disk that the compiled manifest misses.
+ * Fold in capabilities authored on disk that the compiled manifest misses.
  *
  * @remarks
- * `readStructure` reads `.eve/compile`'s manifest, which only `eve build`
- * regenerates — `eve dev` does not. So a freshly authored schedule/tool/skill
- * (e.g. from Evolve) is invisible until the next build. Folding in the source
- * files keeps counts and lists honest immediately, without a slow rebuild.
+ * Fallback only. The normal refresh path runs `eve info --json`, which
+ * regenerates the manifest from source; this overlay keeps counts honest when
+ * that fails (eve not installed yet, discovery error) and a file was just
+ * scaffolded. The model is always read straight from `agent.ts` because it is
+ * the one field users switch most often.
  */
 function mergeAuthored(
   agentPath: string,
   base: AgentStructure,
 ): AgentStructure {
   const root = agentRootOf(agentPath);
-  const named = (
-    arr: { name: string }[],
+  const named = <T extends { name: string }>(
+    arr: T[],
     names: string[],
-  ): { name: string }[] => {
+  ): T[] => {
     const out = [...arr];
     for (const n of names) {
       if (!out.some((x) => x.name === n)) {
-        out.push({ name: n });
+        out.push({ name: n } as T);
       }
     }
     return out;
   };
-  const hooks = [...base.hooks];
+  const hooks: StructureHook[] = [...base.hooks];
   for (const n of listDir(join(root, "hooks"), "ts")) {
-    if (!hooks.includes(n)) {
-      hooks.push(n);
+    if (!hooks.some((h) => h.name === n)) {
+      hooks.push({ name: n });
     }
   }
-  // Read the model straight from agent.ts. The compiled manifest is only
-  // rewritten by `eve build`; `eve dev` and `eve deploy` leave it stale, so the
-  // manifest's model can lag what's actually authored (and deployed) — every
-  // consumer of structure.model would show the old model after a switch.
+  const memories = [...base.memories];
+  for (const n of listDir(join(root, "memory"), "ts")) {
+    if (!memories.some((m) => m.slot === n)) {
+      memories.push({ slot: n, logicalPath: `memory/${n}.ts` });
+    }
+  }
   const authoredModel = readModelConfig(agentPath).model;
 
   return {
@@ -72,19 +82,9 @@ function mergeAuthored(
     skills: named(base.skills, listDir(join(root, "skills"), "dirs")),
     subagents: named(base.subagents, listDir(join(root, "subagents"), "dirs")),
     hooks,
+    memories,
   };
 }
-
-const EMPTY = {
-  tools: [] as never[],
-  connections: [] as never[],
-  skills: [] as never[],
-  channels: [] as never[],
-  schedules: [] as never[],
-  subagents: [] as never[],
-  remoteAgents: [] as never[],
-  hooks: [] as string[],
-};
 
 function empty(
   source: AgentStructure["source"],
@@ -93,7 +93,16 @@ function empty(
   return {
     source,
     model: null,
-    ...EMPTY,
+    tools: [],
+    connections: [],
+    skills: [],
+    channels: [],
+    schedules: [],
+    subagents: [],
+    remoteAgents: [],
+    hooks: [],
+    memories: [],
+    extensions: [],
     sandbox: null,
     diagnostics: { errors: 0, warnings: 0 },
     ...(error ? { error } : {}),
@@ -101,7 +110,9 @@ function empty(
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: manifest is external JSON
-function arr(v: any): any[] {
+type Any = any;
+
+function arr(v: Any): Any[] {
   return Array.isArray(v) ? v : [];
 }
 
@@ -118,36 +129,101 @@ function dedupeBy<T>(items: T[], key: (t: T) => string): T[] {
   return out;
 }
 
+/** Framework defaults carry `sourceId` `eve:defaults:*` / `eve:root-defaults:*`. */
+function isFrameworkSource(sourceId: unknown): boolean {
+  return typeof sourceId === "string" && sourceId.startsWith("eve:");
+}
+
+/** Extension contributions carry `sourceId` `ext:<ns>:…` or `owner.kind === "extension"`. */
+function extensionOf(entry: Any): string | undefined {
+  if (entry?.owner?.kind === "extension" && entry.owner.namespace) {
+    return String(entry.owner.namespace);
+  }
+  const src = entry?.sourceId;
+  if (typeof src === "string" && src.startsWith("ext:")) {
+    return src.split(":")[1] || undefined;
+  }
+  return undefined;
+}
+
+function originOf(entry: Any): { origin: StructureOrigin; extension?: string } {
+  const extension = extensionOf(entry);
+  if (extension) {
+    return { origin: "extension", extension };
+  }
+  if (isFrameworkSource(entry?.sourceId)) {
+    return { origin: "framework" };
+  }
+  return { origin: "application" };
+}
+
 /**
- * Normalize the compiled-agent-manifest.json produced by `eve build`/`eve dev`.
+ * Whether an application tool's source is a leftover from Eve Studio's retired
+ * Evolve feature (its generated `propose_change` tool carried a
+ * `eve-studio-proposal` marker / "Eve Studio … propose" header).
+ */
+function isLegacyStudioTool(agentRoot: unknown, logicalPath: unknown): boolean {
+  if (typeof agentRoot !== "string" || typeof logicalPath !== "string") {
+    return false;
+  }
+  try {
+    const src = readFileSync(join(agentRoot, logicalPath), "utf8");
+    return (
+      src.includes("eve-studio-proposal") ||
+      (src.includes("Eve Studio") && /propose/i.test(src))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Normalize `.eve/compile/compiled-agent-manifest.json`.
  *
  * @remarks
- * Shapes verified against Eve 0.23's compiled manifest: `config.model.id`,
- * `tools[].{name,description}`, `connections[].{connectionName,protocol,url}`,
- * `skills[].{logicalPath,description}` (skill id derived from the folder),
- * `channels[].{name,method,urlPath,adapterKind}`, `schedules[].{name,cron}`,
- * `subagents[].{name,description}`, `sandbox.backendName`, `diagnosticsSummary`.
+ * Shapes verified against eve 0.49's compiled manifest (`version: 47`):
+ * `config.model.id`, `tools[].{name,description,requiresApproval,sourceId}`,
+ * `connections[].{connectionName,protocol,url,description,sourceId}`,
+ * `skills[].{name,skillId,description,owner}`, `channelRoutes.effective[]`
+ * (no top-level `channels[]` any more; the default `eve` channel appears once
+ * per route → dedupe by name), `schedules[].{name,cron,markdown,hasRun}`,
+ * `subagents[].{name,description,owner,agent.config.description}`,
+ * `hooks[].{slug,eventNames}`, `memories[].{slot,description,visibility,
+ * logicalPath}`, `extensionMounts[].{namespace,packageName,mountLogicalPath}`,
+ * `sandbox.sourceId` (`eve:defaults:sandbox.ts` = framework default),
+ * `diagnosticsSummary`.
  */
-// biome-ignore lint/suspicious/noExplicitAny: manifest is external JSON
-function normalizeCompiled(m: any): AgentStructure {
+function normalizeCompiled(m: Any): AgentStructure {
+  // Manifest v47 exposes `channelRoutes.effective[]`; older manifests (eve
+  // < 0.45) still carry a top-level `channels[]` with the same row shape.
+  const routes = arr(m?.channelRoutes?.effective).length
+    ? arr(m?.channelRoutes?.effective)
+    : arr(m?.channels);
   return {
     source: "compiled",
     model: m?.config?.model?.id ?? null,
     displayName: m?.config?.name ?? null,
-    // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-    tools: arr(m.tools).map((t: any) => ({
-      name: t.name,
-      description: t.description,
-    })),
-    // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-    connections: arr(m.connections).map((c: any) => ({
+    tools: arr(m.tools).map((t: Any) => {
+      const origin = originOf(t);
+      return {
+        name: t.name,
+        description: t.description,
+        requiresApproval: Boolean(t.requiresApproval),
+        ...origin,
+        ...(origin.origin === "application" &&
+        isLegacyStudioTool(m?.agentRoot, t.logicalPath)
+          ? { legacyStudio: true }
+          : {}),
+      };
+    }),
+    connections: arr(m.connections).map((c: Any) => ({
       name: c.connectionName ?? c.name,
       protocol: c.protocol,
       url: c.url,
       description: c.description,
+      ...originOf(c),
     })),
-    // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-    skills: arr(m.skills).map((s: any) => ({
+    skills: arr(m.skills).map((s: Any) => ({
       name:
         s.name ??
         s.skillId ??
@@ -155,44 +231,60 @@ function normalizeCompiled(m: any): AgentStructure {
           .replace(/^skills\//, "")
           .replace(/\/SKILL\.md$/i, ""),
       description: s.description,
+      ...originOf(s),
     })),
-    // Dedupe: the manifest lists the default eve channel once per route.
     channels: dedupeBy(
-      // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-      arr(m.channels).map((c: any) => ({
+      routes.map((c: Any) => ({
         name: c.name,
         method: c.method,
         urlPath: c.urlPath,
         kind: c.adapterKind ?? c.kind,
+        ...originOf(c),
       })),
-      (c) => `${c.name}:${c.kind}`,
+      (c) => String(c.name),
     ),
-    // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-    schedules: arr(m.schedules).map((s: any) => ({
+    schedules: arr(m.schedules).map((s: Any) => ({
       name: s.name,
       cron: s.cron,
+      markdown: typeof s.markdown === "string" ? s.markdown : undefined,
+      hasRun: Boolean(s.hasRun),
     })),
-    // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-    subagents: arr(m.subagents).map((s: any) => ({
+    subagents: arr(m.subagents).map((s: Any) => ({
       name: s.name ?? s?.agent?.config?.name,
       description: s.description ?? s?.agent?.config?.description,
+      ...originOf(s),
     })),
-    // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-    remoteAgents: arr(m.remoteAgents).map((r: any) => ({
+    remoteAgents: arr(m.remoteAgents).map((r: Any) => ({
       name: r.name ?? r.remoteAgentName,
       url: r.url,
     })),
-    // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-    hooks: arr(m.hooks).map(
-      // biome-ignore lint/suspicious/noExplicitAny: manifest entry
-      (h: any) =>
-        h.name ??
+    hooks: arr(m.hooks).map((h: Any) => ({
+      name:
         h.slug ??
+        h.name ??
         String(h.logicalPath ?? "hook")
           .replace(/^hooks\//, "")
           .replace(/\.tsx?$/, ""),
-    ),
-    sandbox: m?.sandbox?.backendName ?? null,
+      eventNames: Array.isArray(h.eventNames)
+        ? h.eventNames.map(String)
+        : undefined,
+    })),
+    memories: arr(m.memories).map((mem: Any) => ({
+      slot: String(mem.slot ?? ""),
+      description: mem.description,
+      visibility: mem.visibility,
+      logicalPath: String(mem.logicalPath ?? `memory/${mem.slot}.ts`),
+    })),
+    extensions: arr(m.extensionMounts).map((x: Any) => ({
+      namespace: String(x.namespace ?? ""),
+      packageName: String(x.packageName ?? ""),
+      mountLogicalPath: String(x.mountLogicalPath ?? ""),
+    })),
+    sandbox: m?.sandbox
+      ? isFrameworkSource(m.sandbox.sourceId)
+        ? "default"
+        : String(m.sandbox.logicalPath ?? "sandbox.ts")
+      : (m?.sandbox?.backendName ?? null),
     diagnostics: {
       errors: m?.diagnosticsSummary?.errors ?? 0,
       warnings: m?.diagnosticsSummary?.warnings ?? 0,
@@ -211,50 +303,119 @@ function readCompiledFile(path: string): AgentStructure | null {
   }
 }
 
+const NO_MANIFEST =
+  "No compiled manifest. Install eve in the project (or run `eve info` in its folder) to inspect its structure.";
+
 /**
- * Read an agent's structure from its compiled manifest, building it first via
- * `eve build` when no compiled artifact exists yet.
+ * Read an agent's structure from whatever manifest is on disk (no eve run).
  *
  * @param agentPath - The agent project's root directory.
  * @returns A normalized {@link AgentStructure}; `source: "none"` with an
- *   `error` when the manifest can't be produced.
+ *   `error` when no manifest exists.
  */
 export function readStructure(agentPath: string): AgentStructure {
-  const compiledPath = join(
-    agentPath,
-    ".eve",
-    "compile",
-    "compiled-agent-manifest.json",
-  );
-
-  const existing = readCompiledFile(compiledPath);
+  const existing = readCompiledFile(manifestPath(agentPath));
   if (existing) {
     return mergeAuthored(agentPath, existing);
   }
+  return mergeAuthored(agentPath, empty("none", NO_MANIFEST));
+}
 
-  // No compiled artifact yet — build once, then read. Go through eveBin: a bare
-  // `npx eve` can hang on npx's install prompt or resolve an unrelated eve@0.5.4.
-  const { cmd, pre } = eveBin(agentPath);
+/** Newest mtime under `agent/` (recursive, skipping node_modules), or 0. */
+function newestSourceMtime(dir: string): number {
+  let newest = 0;
+  const walk = (d: string, depth: number): void => {
+    if (depth > 6) {
+      return;
+    }
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.name === "node_modules" || e.name.startsWith(".")) {
+        continue;
+      }
+      const p = join(d, e.name);
+      try {
+        const st = statSync(p);
+        if (st.mtimeMs > newest) {
+          newest = st.mtimeMs;
+        }
+        if (e.isDirectory()) {
+          walk(p, depth + 1);
+        }
+      } catch {
+        // unreadable entry
+      }
+    }
+  };
+  walk(dir, 0);
+  return newest;
+}
+
+/** True when a source file under `agent/` is newer than the compiled manifest. */
+function manifestStale(agentPath: string): boolean {
+  const mp = manifestPath(agentPath);
+  if (!existsSync(mp)) {
+    return true;
+  }
   try {
-    spawnSync(cmd, [...pre, "build"], {
-      cwd: agentPath,
-      encoding: "utf8",
-      timeout: 180_000,
-      env: { ...process.env, NO_COLOR: "1" },
-    });
+    const manifestAt = statSync(mp).mtimeMs;
+    return newestSourceMtime(agentRootOf(agentPath)) > manifestAt;
   } catch {
-    // fall through to the read attempt / error below
+    return true;
   }
+}
 
-  const built = readCompiledFile(compiledPath);
-  if (built) {
-    return mergeAuthored(agentPath, built);
+const inflight = new Map<string, Promise<AgentStructure>>();
+
+/**
+ * Refresh + read an agent's structure.
+ *
+ * @remarks
+ * Runs `eve info --json` (regenerates the compiled manifest from source
+ * without booting a server) when the manifest is missing or older than a
+ * source file under `agent/`, or when `force` is set. Falls back to the
+ * on-disk manifest with the authored-files overlay when eve fails.
+ * Concurrent refreshes of the same agent share one run.
+ */
+export function refreshStructure(
+  agentPath: string,
+  force = false,
+): Promise<AgentStructure> {
+  const pending = inflight.get(agentPath);
+  if (pending) {
+    return pending;
   }
-  return mergeAuthored(
-    agentPath,
-    empty(
-      "none",
-      "No compiled manifest. Start the agent (or run `eve build` in its folder) to inspect its structure.",
-    ),
-  );
+  const task = (async (): Promise<AgentStructure> => {
+    if (!(force || manifestStale(agentPath))) {
+      return readStructure(agentPath);
+    }
+    const res = await eveInfoJson(agentPath);
+    const fresh = readCompiledFile(manifestPath(agentPath));
+    if (fresh) {
+      const s = res.ok ? fresh : mergeAuthored(agentPath, fresh);
+      if (res.info?.diagnostics) {
+        s.diagnostics = {
+          errors: res.info.diagnostics.errors ?? s.diagnostics.errors,
+          warnings: res.info.diagnostics.warnings ?? s.diagnostics.warnings,
+        };
+      }
+      return s;
+    }
+    return mergeAuthored(
+      agentPath,
+      empty(
+        "none",
+        res.output
+          ? `eve info failed:\n${res.output.split("\n").slice(-8).join("\n").slice(0, 600)}`
+          : NO_MANIFEST,
+      ),
+    );
+  })().finally(() => inflight.delete(agentPath));
+  inflight.set(agentPath, task);
+  return task;
 }

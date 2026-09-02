@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ConnectorPicker } from "../components/ConnectorPicker";
 import { ConnectorsGallery } from "../components/ConnectorsGallery";
+import { RegistryGallery } from "../components/RegistryGallery";
 import { useActiveStructure } from "../lib/useStructure";
 import {
   IconExternal,
@@ -286,10 +287,111 @@ function AddConnectionModal({
   );
 }
 
+/** Read/edit an extension's mount file (`agent/extensions/<ns>.ts`). */
+function ExtensionMountModal({
+  agentId,
+  ns,
+  onClose,
+}: {
+  agentId: string;
+  ns: string;
+  onClose: () => void;
+}): JSX.Element {
+  const [content, setContent] = useState<string | null>(null);
+  const [original, setOriginal] = useState("");
+  const [relPath, setRelPath] = useState("");
+  const [exists, setExists] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const f = await window.studio.registry.readExtensionMount(agentId, ns);
+      setContent(f.content);
+      setOriginal(f.content);
+      setRelPath(f.relPath);
+      setExists(f.exists);
+    })();
+  }, [agentId, ns]);
+
+  const dirty = content !== null && content !== original;
+
+  const save = async (): Promise<void> => {
+    if (content === null) {
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    const r = await window.studio.registry.writeExtensionMount(
+      agentId,
+      ns,
+      content,
+    );
+    setSaving(false);
+    if (r.ok) {
+      setOriginal(content);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } else {
+      setErr(r.error ?? "Failed to save.");
+    }
+  };
+
+  return (
+    <Modal
+      title={`Extension mount · ${ns}`}
+      onClose={onClose}
+      width="max-w-2xl"
+    >
+      <div className="space-y-3 p-4">
+        <div className="flex items-center gap-2 font-mono text-2xs text-faint">
+          {relPath}
+          <div className="flex-1" />
+          {dirty ? <span className="text-warn">unsaved</span> : null}
+          {saved ? <span className="text-success">saved ✓</span> : null}
+        </div>
+        <p className="text-2xs leading-relaxed text-muted">
+          This connection is contributed by the{" "}
+          <span className="font-mono text-text">{ns}</span> extension. Its
+          connection file lives inside the package; what you can edit is the
+          mount that configures it.
+        </p>
+        {content === null ? (
+          <div className="flex h-64 items-center justify-center">
+            <Spinner />
+          </div>
+        ) : !exists ? (
+          <div className="rounded-lg bg-warn/10 px-3 py-2 text-[13px] text-warn">
+            {relPath} was not found on disk — the manifest may be stale.
+          </div>
+        ) : (
+          <Textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            spellCheck={false}
+            className="h-72 resize-none font-mono text-[12px]"
+          />
+        )}
+        {err ? <div className="text-xs text-danger">{err}</div> : null}
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+          <Button variant="primary" onClick={save} disabled={!dirty || saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function Connections(): JSX.Element {
   const { id, structure, loading, reload } = useActiveStructure();
   const [addOpen, setAddOpen] = useState(false);
   const [editName, setEditName] = useState<string | null>(null);
+  const [editMount, setEditMount] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -330,18 +432,15 @@ export function Connections(): JSX.Element {
 
       <div className="flex-1 overflow-auto px-4 py-4">
         <div className="mx-auto max-w-2xl space-y-8">
-          {id ? <ConnectorsGallery agentId={id} /> : null}
-
-          <div className="space-y-2.5 border-t border-border pt-6">
+          {/* (a) what the agent has today: authored files + extension-contributed */}
+          <div className="space-y-2.5">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <Kicker className="mb-1.5">
-                  Custom connections · MCP / OpenAPI
-                </Kicker>
+                <Kicker className="mb-1.5">This agent's connections</Kicker>
                 <div className="text-[13px] leading-relaxed text-muted">
-                  Connection files the agent authors under
-                  <span className="font-mono"> connections/</span> (like
-                  Arcana).
+                  MCP / OpenAPI connections the agent authors under{" "}
+                  <span className="font-mono">connections/</span>, plus the ones
+                  its mounted extensions contribute.
                 </div>
               </div>
               <Button
@@ -360,8 +459,9 @@ export function Connections(): JSX.Element {
                   <IconPlug className="h-6 w-6" />
                 </div>
                 <div className="max-w-sm text-[13px] leading-relaxed text-muted">
-                  No custom connections yet — wire an MCP server or OpenAPI API
-                  directly.
+                  No connections yet — wire an MCP server or OpenAPI API
+                  directly, use a Vercel Connect connector, or install one from
+                  the registry below.
                 </div>
                 <Button
                   variant="primary"
@@ -375,48 +475,81 @@ export function Connections(): JSX.Element {
               </div>
             ) : (
               <List>
-                {visibleConns.map((c) => (
-                  <ListRow
-                    key={c.name}
-                    icon={<IconPlug className="h-4 w-4" />}
-                    title={c.name}
-                    badge={
-                      c.protocol ? (
-                        <Badge tone="info">{c.protocol}</Badge>
-                      ) : undefined
-                    }
-                    desc={c.description || undefined}
-                    meta={
-                      c.url ? (
+                {visibleConns.map((c) => {
+                  const viaExt = c.origin === "extension";
+                  const ns = c.extension ?? c.name.split("__")[0];
+                  return (
+                    <ListRow
+                      key={c.name}
+                      icon={<IconPlug className="h-4 w-4" />}
+                      title={c.name}
+                      badge={
+                        <>
+                          {c.protocol ? (
+                            <Badge tone="info">{c.protocol}</Badge>
+                          ) : null}
+                          {viaExt ? (
+                            <Badge tone="violet">via extension {ns}</Badge>
+                          ) : null}
+                        </>
+                      }
+                      desc={c.description || undefined}
+                      meta={
                         <div className="flex items-center gap-1 truncate font-mono text-2xs text-faint">
-                          <IconExternal className="h-3 w-3 shrink-0" />
-                          {c.url}
+                          {c.url ? (
+                            <>
+                              <IconExternal className="h-3 w-3 shrink-0" />
+                              {c.url}
+                            </>
+                          ) : viaExt ? (
+                            `agent/extensions/${ns}.ts`
+                          ) : (
+                            `connections/${c.name}.ts`
+                          )}
                         </div>
-                      ) : undefined
-                    }
-                    right={
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setEditName(c.name)}
-                        >
-                          Open
-                        </Button>
-                        <IconButton
-                          onClick={() => setConfirmDelete(c.name)}
-                          title="Delete"
-                          className="hover:bg-danger/10 hover:text-danger"
-                        >
-                          <IconTrash className="h-3.5 w-3.5" />
-                        </IconButton>
-                      </div>
-                    }
-                  />
-                ))}
+                      }
+                      right={
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              viaExt ? setEditMount(ns) : setEditName(c.name)
+                            }
+                          >
+                            Open
+                          </Button>
+                          {viaExt ? null : (
+                            <IconButton
+                              onClick={() => setConfirmDelete(c.name)}
+                              title="Delete"
+                              className="hover:bg-danger/10 hover:text-danger"
+                            >
+                              <IconTrash className="h-3.5 w-3.5" />
+                            </IconButton>
+                          )}
+                        </div>
+                      }
+                    />
+                  );
+                })}
               </List>
             )}
           </div>
+
+          {/* (b) Vercel Connect */}
+          {id ? (
+            <div className="border-t border-border pt-6">
+              <ConnectorsGallery agentId={id} />
+            </div>
+          ) : null}
+
+          {/* (c) registry */}
+          {id ? (
+            <div className="border-t border-border pt-6">
+              <RegistryGallery agentId={id} mode="connections" />
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -429,6 +562,14 @@ export function Connections(): JSX.Element {
           agentId={id}
           name={editName}
           onClose={() => setEditName(null)}
+        />
+      ) : null}
+
+      {editMount && id ? (
+        <ExtensionMountModal
+          agentId={id}
+          ns={editMount}
+          onClose={() => setEditMount(null)}
         />
       ) : null}
 

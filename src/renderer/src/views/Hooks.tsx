@@ -146,11 +146,16 @@ export function Hooks(): JSX.Element {
             <List>
               {hooks.map((h) => (
                 <ListRow
-                  key={h}
+                  key={h.name}
                   icon={<IconBolt className="h-4 w-4" />}
-                  title={h}
+                  title={h.name}
                   badge={<Badge>hook</Badge>}
-                  onClick={() => setEditing(h)}
+                  desc={
+                    h.eventNames && h.eventNames.length > 0
+                      ? h.eventNames.join(", ")
+                      : undefined
+                  }
+                  onClick={() => setEditing(h.name)}
                   right={
                     <IconChevronRight className="mt-1.5 h-4 w-4 text-faint opacity-0 transition-opacity group-hover:opacity-100" />
                   }

@@ -8,7 +8,6 @@ import {
   type AppInfo,
   type ArcanaResult,
   type ArcanaStats,
-  type BrainInfo,
   type ChatEventMessage,
   type ChatStatusMessage,
   type ChannelAddInput,
@@ -31,10 +30,7 @@ import {
   type EnvState,
   type EvalItem,
   type EveEvent,
-  type EvolveApplyResult,
-  type EvolveDetectResult,
-  type EvolveDraftResult,
-  type EvolveProposal,
+  type EveUpgradeResult,
   type FileWriteResult,
   IPC,
   type InstructionsFile,
@@ -44,7 +40,7 @@ import {
   type ModelReadiness,
   type ProdInfo,
   type QueryHit,
-  type QueuedProposalsResult,
+  type RegistryAddResult,
   type SandboxInfo,
   type ScheduleInput,
   type SkillInput,
@@ -74,9 +70,19 @@ import {
   type VercelWhoami,
   type WireBrainInput,
   type WireBrainResult,
+  type ConnectorsAttached,
+  type MemorySlotsResult,
+  type MigrateBrainResult,
+  type RegistryAddChunk,
+  type RegistryInstallOptions,
+  type RegistryInstallResult,
+  type RegistryListResult,
+  type SelfModStatus,
 } from "../shared/ipc";
 
 type WriteResult = { ok: boolean; error?: string };
+/** Outcome of a session control route (cancel / compact / clear / reset). */
+type ControlResult = { ok: boolean; status: string; error?: string };
 
 function sub<T>(channel: string, cb: (payload: T) => void): () => void {
   const listener = (_e: IpcRendererEvent, payload: T): void => cb(payload);
@@ -104,8 +110,9 @@ const api = {
       ipcRenderer.invoke(IPC.agentStatus, id),
     info: (id: string): Promise<unknown> =>
       ipcRenderer.invoke(IPC.agentInfo, id),
-    structure: (id: string): Promise<AgentStructure> =>
-      ipcRenderer.invoke(IPC.agentStructure, id),
+    /** Structure from the compiled manifest; `refresh` forces `eve info --json`. */
+    structure: (id: string, refresh?: boolean): Promise<AgentStructure> =>
+      ipcRenderer.invoke(IPC.agentStructure, id, refresh),
     readInstructions: (id: string): Promise<InstructionsFile> =>
       ipcRenderer.invoke(IPC.agentReadInstructions, id),
     writeInstructions: (id: string, content: string): Promise<boolean> =>
@@ -116,6 +123,12 @@ const api = {
       ipcRenderer.invoke(IPC.agentCreate, input),
     register: (dir: string): Promise<AddAgentResult> =>
       ipcRenderer.invoke(IPC.agentRegister, dir),
+    /** `eve@latest` from the npm registry (cached ~1h; null when offline). */
+    eveLatest: (force?: boolean): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.eveLatest, force),
+    /** Install eve@latest (+ @kybernesis/arcana@latest) and re-run eve info; streams to cli.onChunk under `runId`. */
+    upgradeEve: (id: string, runId: string): Promise<EveUpgradeResult> =>
+      ipcRenderer.invoke(IPC.eveUpgrade, id, runId),
     createSkill: (id: string, input: SkillInput): Promise<FileWriteResult> =>
       ipcRenderer.invoke(IPC.skillCreate, id, input),
     addConnection: (
@@ -203,8 +216,9 @@ const api = {
       ipcRenderer.invoke(IPC.sandboxCreate, id),
     channelsList: (id: string): Promise<ChannelItem[]> =>
       ipcRenderer.invoke(IPC.channelsList, id),
-    channelAdd: (id: string, kind: "slack" | "web"): Promise<CmdResult> =>
-      ipcRenderer.invoke(IPC.channelAdd, id, kind),
+    /** Install Web Chat via `eve add channel/web --non-interactive --yes`. */
+    channelAdd: (id: string): Promise<RegistryAddResult> =>
+      ipcRenderer.invoke(IPC.channelAdd, id),
     channelWrite: (
       id: string,
       input: ChannelAddInput,
@@ -430,36 +444,6 @@ const api = {
       ipcRenderer.invoke(IPC.teamsStatus, id),
   },
 
-  evolve: {
-    draft: (
-      id: string,
-      intent: string,
-      timezone?: string,
-    ): Promise<EvolveDraftResult> =>
-      ipcRenderer.invoke(IPC.evolveDraft, id, intent, timezone),
-    apply: (id: string, proposal: EvolveProposal): Promise<EvolveApplyResult> =>
-      ipcRenderer.invoke(IPC.evolveApply, id, proposal),
-    detect: (id: string): Promise<EvolveDetectResult> =>
-      ipcRenderer.invoke(IPC.evolveDetect, id),
-    getProposeTool: (id: string): Promise<boolean> =>
-      ipcRenderer.invoke(IPC.evolveGetProposeTool, id),
-    setProposeTool: (
-      id: string,
-      enabled: boolean,
-    ): Promise<{ enabled: boolean; backend?: "arcana" | "blob" }> =>
-      ipcRenderer.invoke(IPC.evolveSetProposeTool, id, enabled),
-    queueStatus: (
-      id: string,
-    ): Promise<{ backend: "arcana" | "blob"; ready: boolean }> =>
-      ipcRenderer.invoke(IPC.evolveQueueStatus, id),
-    createQueueStore: (id: string): Promise<CmdResult> =>
-      ipcRenderer.invoke(IPC.evolveCreateQueueStore, id),
-    listProposals: (id: string): Promise<QueuedProposalsResult> =>
-      ipcRenderer.invoke(IPC.evolveListProposals, id),
-    resolveProposal: (id: string, note: string): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke(IPC.evolveResolveProposal, id, note),
-  },
-
   dialog: {
     pickDir: (): Promise<string | null> =>
       ipcRenderer.invoke(IPC.dialogPickDir),
@@ -485,18 +469,6 @@ const api = {
   arcana: {
     detect: (id: string): Promise<DetectedBrain> =>
       ipcRenderer.invoke(IPC.arcanaDetect, id),
-    saveBrain: (
-      id: string,
-      input: {
-        workspace: string;
-        envVar: string;
-        key?: string;
-        fromEnv?: boolean;
-      },
-    ): Promise<{ ok: boolean; error?: string; info?: BrainInfo | null }> =>
-      ipcRenderer.invoke(IPC.arcanaSaveBrain, id, input),
-    forgetBrain: (id: string): Promise<boolean> =>
-      ipcRenderer.invoke(IPC.arcanaForgetBrain, id),
     validate: (
       workspace: string,
       key: string,
@@ -511,8 +483,16 @@ const api = {
       ipcRenderer.invoke(IPC.arcanaTimeline, id, limit),
     query: (id: string, q: string): Promise<ArcanaResult<QueryHit[]>> =>
       ipcRenderer.invoke(IPC.arcanaQuery, id, q),
-    wire: (id: string, input: WireBrainInput): Promise<WireBrainResult> =>
-      ipcRenderer.invoke(IPC.arcanaWire, id, input),
+    /** Wire the official extension; `runId` streams the install to registry.onChunk. */
+    wire: (
+      id: string,
+      input: WireBrainInput,
+      runId?: string,
+    ): Promise<WireBrainResult> =>
+      ipcRenderer.invoke(IPC.arcanaWire, id, input, runId),
+    /** Move a legacy connections/arcana.ts agent onto the extension. */
+    migrate: (id: string, runId?: string): Promise<MigrateBrainResult> =>
+      ipcRenderer.invoke(IPC.arcanaMigrate, id, runId),
   },
 
   chat: {
@@ -547,6 +527,31 @@ const api = {
         text,
         target,
       ),
+    /** POST /cancel for the thread's session (scoped to the last observed turn). */
+    cancel: (
+      threadId: string,
+      target: ChatTarget = "local",
+      turnId?: string,
+    ): Promise<ControlResult> =>
+      ipcRenderer.invoke(IPC.chatCancel, threadId, target, turnId),
+    /** POST /compact — summarize context in place. */
+    compact: (
+      threadId: string,
+      target: ChatTarget = "local",
+    ): Promise<ControlResult> =>
+      ipcRenderer.invoke(IPC.chatCompact, threadId, target),
+    /** POST /clear — drop model-message history, keep the session. */
+    clear: (
+      threadId: string,
+      target: ChatTarget = "local",
+    ): Promise<ControlResult> =>
+      ipcRenderer.invoke(IPC.chatClear, threadId, target),
+    /** POST /reset — retire the session; the thread's next message starts fresh. */
+    reset: (
+      threadId: string,
+      target: ChatTarget = "local",
+    ): Promise<ControlResult> =>
+      ipcRenderer.invoke(IPC.chatReset, threadId, target),
     onEvent: (cb: (m: ChatEventMessage) => void): (() => void) =>
       sub(IPC.chatEvent, cb),
     onStatus: (cb: (m: ChatStatusMessage) => void): (() => void) =>
@@ -562,6 +567,64 @@ const api = {
     install: (): Promise<void> => ipcRenderer.invoke(IPC.updaterInstall),
     onState: (cb: (s: UpdateState) => void): (() => void) =>
       sub(IPC.updaterState, cb),
+  },
+
+  // ---- Registry & memory (eve 0.49) ----
+  registry: {
+    /** `eve registry list --json` (cached ~10 min per agent). */
+    list: (id: string, force?: boolean): Promise<RegistryListResult> =>
+      ipcRenderer.invoke(IPC.registryList, id, force),
+    /** `eve registry view <item>` — plain text. */
+    view: (id: string, item: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.registryView, id, item),
+    /** `eve add <item> --non-interactive --yes`; output streams to onChunk under `runId`. */
+    add: (
+      id: string,
+      item: string,
+      runId: string,
+      opts?: RegistryInstallOptions,
+    ): Promise<RegistryInstallResult> =>
+      ipcRenderer.invoke(IPC.registryAdd, id, item, runId, opts),
+    onChunk: (cb: (c: RegistryAddChunk) => void): (() => void) =>
+      sub(IPC.registryAddChunk, cb),
+    selfModStatus: (id: string): Promise<SelfModStatus> =>
+      ipcRenderer.invoke(IPC.selfModStatus, id),
+    /** `eve add experimental/self-modification` (dev-only subagent). */
+    enableSelfModification: (
+      id: string,
+      runId: string,
+    ): Promise<RegistryInstallResult> =>
+      ipcRenderer.invoke(IPC.selfModEnable, id, runId),
+    /** Connector UIDs attached to this agent's linked Vercel project. */
+    connectorsAttached: (id: string): Promise<ConnectorsAttached> =>
+      ipcRenderer.invoke(IPC.connectorsAttached, id),
+    /** Read `agent/extensions/<ns>.ts`. */
+    readExtensionMount: (
+      id: string,
+      ns: string,
+    ): Promise<{ relPath: string; content: string; exists: boolean }> =>
+      ipcRenderer.invoke(IPC.extensionMountRead, id, ns),
+    writeExtensionMount: (
+      id: string,
+      ns: string,
+      content: string,
+    ): Promise<{ ok: boolean; relPath?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC.extensionMountWrite, id, ns, content),
+  },
+
+  memory: {
+    slots: (id: string): Promise<MemorySlotsResult> =>
+      ipcRenderer.invoke(IPC.memorySlots, id),
+    /** Scaffold agent/memory/<slot>.ts with eve's built-in fileMemory(). */
+    addFile: (
+      id: string,
+      slot?: string,
+      description?: string,
+    ): Promise<{ ok: boolean; relPath?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC.memoryAddFile, id, slot, description),
+    /** `eve add memory/supermemory`; output streams to registry.onChunk. */
+    addSupermemory: (id: string, runId: string): Promise<RegistryInstallResult> =>
+      ipcRenderer.invoke(IPC.memoryAddSupermemory, id, runId),
   },
 };
 

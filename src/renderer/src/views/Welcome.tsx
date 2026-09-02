@@ -27,8 +27,9 @@ export function Welcome({
             in one place.
           </h1>
           <p className="mt-3.5 max-w-sm text-[14px] leading-relaxed text-muted">
-            Chat, inspect structure, wire Arcana memory, manage connections and
-            schedules, and deploy — all local, all yours.
+            Chat, inspect structure, wire memory, add integrations from the
+            registry, and deploy — all local, all yours. Eve is Vercel's
+            open-source agent framework.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
@@ -57,7 +58,9 @@ export function Welcome({
             <code className="rounded bg-black/[0.05] px-1 font-mono">
               agent/
             </code>{" "}
-            directory). Studio spawns its dev server and talks to it locally.
+            directory), or create one — that installs eve@latest (0.49+) and
+            needs Node 24. Studio spawns its dev server and talks to it
+            locally. Docs: https://eve.dev/docs
           </p>
         </div>
       </div>

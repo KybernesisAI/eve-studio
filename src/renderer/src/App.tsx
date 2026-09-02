@@ -1,5 +1,6 @@
 import type { AppInfo, ModelReadiness, ProdInfo } from "@shared/ipc";
 import { useEffect, useState } from "react";
+import { isNewerVersion } from "./lib/semver";
 import { type Section, useStore } from "./store";
 import {
   IconBot,
@@ -19,7 +20,6 @@ import {
   IconSettings,
   IconStop,
   IconTrash,
-  IconWand,
   IconWrench,
 } from "./ui/icons";
 import { EveLogo } from "./ui/EveLogo";
@@ -27,7 +27,6 @@ import { Button, Modal, StatusDot, type TabItem, Tabs } from "./ui/kit";
 import { Chat } from "./views/Chat";
 import { CreateAgent } from "./views/CreateAgent";
 import { Evals } from "./views/Evals";
-import { Evolve } from "./views/Evolve";
 import {
   CapabilitiesGroup,
   DeployGroup,
@@ -37,12 +36,12 @@ import {
 import { Memory } from "./views/Memory";
 import { Schedules } from "./views/Schedules";
 import { Settings } from "./views/Settings";
+import { EveUpgradeModal } from "./components/EveUpgrade";
 import { UpdateBadge } from "./components/UpdateBadge";
 import { Welcome } from "./views/Welcome";
 
 const TABS: TabItem[] = [
   { id: "chat", label: "Chat", icon: IconChat },
-  { id: "evolve", label: "Evolve", icon: IconWand },
   { id: "instructions", label: "Instructions", icon: IconFile },
   { id: "capabilities", label: "Capabilities", icon: IconWrench },
   { id: "integrations", label: "Integrations", icon: IconPlug },
@@ -63,10 +62,13 @@ function AgentWorkspace(): JSX.Element {
   );
   const startAgent = useStore((s) => s.startAgent);
   const stopAgent = useStore((s) => s.stopAgent);
+  const openDeploy = useStore((s) => s.openDeploy);
+  const eveLatest = useStore((s) => s.eveLatest);
 
   const deployNonce = useStore((s) => s.deployNonce);
   const [prod, setProd] = useState<ProdInfo | null>(null);
   const [ready, setReady] = useState<ModelReadiness | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   useEffect(() => {
     if (activeAgentId) {
       window.studio.vercel
@@ -93,6 +95,18 @@ function AgentWorkspace(): JSX.Element {
   );
 
   const busy = status === "starting";
+  const upgradeAvailable = isNewerVersion(eveLatest, agent.eveVersion);
+  const linked = ready ? ready.linked : null;
+  const prodHost = (() => {
+    if (!prod?.url) {
+      return null;
+    }
+    try {
+      return new URL(prod.url).host;
+    } catch {
+      return prod.url;
+    }
+  })();
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -108,22 +122,71 @@ function AgentWorkspace(): JSX.Element {
               {status}
             </span>
           </div>
-          <div className="mt-1.5 flex items-center gap-2 font-spacemono text-[10px] uppercase tracking-[0.12em] text-faint">
-            <span>local{rt?.port ? ` :${rt.port}` : ""}</span>
-            <span className="text-border-strong">/</span>
-            <span className={prod?.url ? "text-success/80" : undefined}>
-              {prod?.url
-                ? `deployed${prod.age ? ` · ${prod.age}` : ""}`
-                : "not deployed"}
+          <div className="no-drag mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 font-spacemono text-[11px] tracking-wide text-faint">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="text-muted">eve {agent.eveVersion ?? "?"}</span>
+              {upgradeAvailable && eveLatest ? (
+                <button
+                  type="button"
+                  onClick={() => setUpgradeOpen(true)}
+                  title={`eve ${eveLatest} is available — click to upgrade this agent`}
+                  className="rounded-full bg-accent/10 px-2 py-[2px] text-[10px] text-accent transition-colors hover:bg-accent/20"
+                >
+                  ↑ {eveLatest} available
+                </button>
+              ) : null}
+              {structure && structure.diagnostics.errors > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setSection("capabilities")}
+                  title="eve info reports discovery errors — the agent will not compile until they are fixed. Open Capabilities for details."
+                  className="rounded-full bg-danger/10 px-2 py-[2px] text-[10px] text-danger transition-colors hover:bg-danger/20"
+                >
+                  {structure.diagnostics.errors} build{" "}
+                  {structure.diagnostics.errors === 1 ? "error" : "errors"}
+                </button>
+              ) : null}
             </span>
-            <span className="text-border-strong">/</span>
-            <span>eve {agent.eveVersion ?? "?"}</span>
-            {ready && !ready.hasCredential ? (
-              <>
-                <span className="text-border-strong">/</span>
+            <span className="text-border-strong">|</span>
+            <span
+              className="inline-flex min-w-0 items-center gap-1.5"
+              title={prod?.url ?? undefined}
+            >
+              <span>Vercel</span>
+              <span className="text-border-strong">·</span>
+              {linked === false ? (
                 <span className="text-warn">not linked</span>
-              </>
-            ) : null}
+              ) : (
+                <>
+                  <span className={linked ? "text-muted" : undefined}>
+                    {linked ? "linked" : "…"}
+                  </span>
+                  <span className="text-border-strong">·</span>
+                  {prodHost ? (
+                    <span className="inline-flex min-w-0 items-center gap-1 text-success/80">
+                      deployed{prod?.age ? ` ${prod.age} ago` : ""}
+                      <span className="max-w-[220px] truncate text-faint">
+                        {prodHost}
+                      </span>
+                    </span>
+                  ) : (
+                    <span>not deployed</span>
+                  )}
+                </>
+              )}
+            </span>
+            <span className="text-border-strong">|</span>
+            <span>
+              local
+              <span className="text-border-strong"> · </span>
+              {status === "running" && rt?.port
+                ? `:${rt.port}`
+                : status === "starting"
+                  ? "starting…"
+                  : status === "error"
+                    ? "error"
+                    : "stopped"}
+            </span>
           </div>
         </div>
         <div className="flex-1" />
@@ -158,16 +221,37 @@ function AgentWorkspace(): JSX.Element {
               {busy ? "Starting…" : "Start"}
             </Button>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setSection("deploy")}
-          >
-            <IconRocket className="h-3.5 w-3.5" />
-            Deploy
-          </Button>
+          {linked === false ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => openDeploy("environment")}
+              title="This project isn't linked to Vercel yet — link it first"
+            >
+              <IconPlug className="h-3.5 w-3.5" />
+              Link &amp; deploy
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => openDeploy("deploy")}
+            >
+              <IconRocket className="h-3.5 w-3.5" />
+              Deploy
+            </Button>
+          )}
         </div>
       </header>
+      {upgradeOpen && eveLatest ? (
+        <EveUpgradeModal
+          agentId={agent.id}
+          agentName={agent.name}
+          installed={agent.eveVersion}
+          latest={eveLatest}
+          onClose={() => setUpgradeOpen(false)}
+        />
+      ) : null}
 
       {/* Tabs */}
       <div className="border-b border-border px-5">
@@ -182,8 +266,6 @@ function AgentWorkspace(): JSX.Element {
       <div className="min-h-0 flex-1 overflow-hidden">
         {section === "chat" ? (
           <Chat />
-        ) : section === "evolve" ? (
-          <Evolve />
         ) : section === "instructions" ? (
           <InstructionsGroup />
         ) : section === "capabilities" ? (
