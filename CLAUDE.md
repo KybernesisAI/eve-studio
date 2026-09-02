@@ -4,7 +4,7 @@ Eve Studio is a macOS Electron control center for Vercel's open-source **Eve** a
 
 ## Current state (2026-09-02)
 
-- Shipped **v0.4.0** (signed, notarized, `latest-mac.yml` published; 0.3.x installs get UPDATE → RESTART). Built for **eve 0.49**, Node 24.
+- Shipped **v0.4.0** (signed, notarized, `latest-mac.yml` published; 0.3.x installs get UPDATE → RESTART). Built for **eve 0.49**, Node 24. `main` is ahead of the tag by post-release fixes (Arcana wiring writes the env-var names the mount reads); cut 0.4.1 when the next batch lands.
 - The 0.4.0 rebuild: Evolve retired; Memory tab on Eve memory slots + the official Arcana extension; registry-powered integrations (`eve add`); in-app eve upgrade; session protocol on 0.49 (no continuation tokens, 202/409, cancel/compact/clear/reset); structure via `eve info --json` and manifest v47; header chips (eve version, "↑ latest available", "N build errors", Vercel/local state).
 - Registered agents on this machine (all upgraded to eve 0.49): eve-gtm (`~/eve-content-agent-template`, deployed), kyber (`~/kyber`), eve-health (`~/eve-health/eve-health`), eve-blob-test, eve-store-test, and the scratch agent `~/studio-e2e` (kept on purpose for testing; linked to the funded Vercel team with Deployment Protection on and a bypass secret saved in Studio).
 
